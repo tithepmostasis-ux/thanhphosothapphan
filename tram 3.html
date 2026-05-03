@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trạm 3: Xưởng Đo Lường - Robo Phẩy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+        
+        body { 
+            font-family: 'Nunito', sans-serif; 
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fcd34d 100%);
+            user-select: none; 
+            overflow: hidden; /* Cố định 100% màn hình, không trượt toàn trang */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Animations */
+        @keyframes floating { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .animate-float { animation: floating 2.5s ease-in-out infinite; }
+        
+        @keyframes spin-slow { 100% { transform: rotate(360deg); } }
+        .animate-spin-slow { animation: spin-slow 10s linear infinite; }
+
+        @keyframes conveyor { 100% { background-position: 50px 0; } }
+        .conveyor-belt { 
+            background-image: repeating-linear-gradient(90deg, #475569 0px, #475569 25px, #334155 25px, #334155 50px);
+            animation: conveyor 1.5s linear infinite; 
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.3);
+        }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 50% { transform: translateX(8px); } 75% { transform: translateX(-8px); } }
+        .shake-error { animation: shake 0.4s; border-color: #ef4444 !important; background-color: #fef2f2 !important; color: #ef4444 !important;}
+
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        /* Nút bấm Game (Giao diện cũ) */
+        .btn-game { 
+            @apply font-black rounded-xl md:rounded-2xl transition-all duration-150 flex items-center justify-center text-center active:translate-y-1 md:active:translate-y-2 disabled:opacity-50 disabled:cursor-not-allowed; 
+        }
+        .btn-primary { @apply bg-amber-500 hover:bg-amber-400 text-white shadow-[0_4px_0_#b45309] md:shadow-[0_6px_0_#b45309] active:shadow-[0_0px_0_#b45309] border-2 border-amber-300; }
+        .btn-success { @apply bg-green-500 hover:bg-green-400 text-white shadow-[0_4px_0_#16a34a] md:shadow-[0_6px_0_#16a34a] active:shadow-[0_0px_0_#16a34a] border-2 border-green-300; }
+        .btn-secondary { @apply bg-gray-100 hover:bg-white text-gray-700 shadow-[0_4px_0_#9ca3af] md:shadow-[0_6px_0_#9ca3af] active:shadow-[0_0px_0_#9ca3af] border-2 border-gray-300; }
+        .btn-warning { @apply bg-orange-100 hover:bg-orange-200 text-orange-600 shadow-[0_4px_0_#c2410c] md:shadow-[0_6px_0_#c2410c] active:shadow-[0_0px_0_#c2410c] border-2 border-orange-300; }
+
+        /* Panels (Giao diện cũ) */
+        .game-panel { @apply bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-b-[6px] md:border-b-[8px] border-amber-200 border-x-2 border-t-2; }
+        .game-card { @apply bg-white rounded-xl shadow-md border-b-4 border-gray-200 border-x-2 border-t-2; }
+
+        /* Speech Bubble */
+        .speech-bubble { 
+            position: relative; background: white; border-radius: 1.5rem; border: 4px solid #f59e0b;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .speech-bubble:after, .speech-bubble:before { 
+            content: ''; position: absolute; bottom: -24px; left: 20%; border: solid transparent; height: 0; width: 0; 
+        }
+        .speech-bubble:after { border-top-color: white; border-width: 15px; margin-left: -15px; bottom: -20px;}
+        .speech-bubble:before { border-top-color: #f59e0b; border-width: 20px; margin-left: -20px; }
+
+        /* Drag Drop */
+        .drag-card { cursor: grab; transition: all 0.2s; z-index: 10; touch-action: manipulation;}
+        .drag-card:active { cursor: grabbing; transform: scale(1.1) rotate(2deg); }
+        .drag-card.selected { @apply ring-4 ring-blue-500 scale-110 shadow-xl rotate-[-2deg]; }
+        .drop-zone { transition: all 0.3s; touch-action: manipulation; cursor: pointer; border-style: dashed; }
+        .drop-zone.drag-over { background-color: #fef08a; border-color: #eab308; transform: scale(1.05); border-style: solid; box-shadow: 0 0 15px rgba(234, 179, 8, 0.5); }
+
+        /* Unit Table */
+        .unit-cell { @apply border-b-4 border-r-2 border-t-2 border-l-2 border-amber-200 text-center font-black p-1 md:p-2 text-2xl md:text-3xl bg-white transition-all duration-300 rounded-lg mx-1; }
+        .unit-header { @apply bg-gradient-to-b from-amber-100 to-amber-200 text-amber-800 border-b-4 border-amber-400 border-x-2 border-t-2 font-black py-2 md:py-3 text-center text-sm md:text-lg rounded-xl mb-2 mx-1 shadow-sm; }
+        .highlight-col { @apply bg-yellow-200 border-yellow-500 text-yellow-900 scale-110 shadow-lg z-10; transform: translateY(-5px);}
+        
+        /* Bảng Phản Hồi */
+        .feedback-box { @apply p-2 md:p-3 rounded-xl font-bold text-center text-xs md:text-base border-2 shadow-sm animate-pop flex items-center justify-center min-h-[3rem] w-full; }
+        .fb-success { @apply bg-green-100 text-green-700 border-green-400; }
+        .fb-error { @apply bg-red-100 text-red-700 border-red-400; }
+        .fb-hint { @apply bg-blue-100 text-blue-700 border-blue-400; }
+        .fb-empty { @apply bg-gray-50 border-gray-200 text-gray-400 border-dashed; }
+
+        /* Thanh cuộn dành riêng cho Game Content */
+        #app-container::-webkit-scrollbar { width: 6px; }
+        #app-container::-webkit-scrollbar-track { background: transparent; }
+        #app-container::-webkit-scrollbar-thumb { background: #fbbf24; border-radius: 10px; }
+    </style>
+</head>
+<body class="h-[100dvh] w-screen flex flex-col items-center relative overflow-hidden bg-gradient-to-br from-amber-50 to-amber-200">
+
+    <div id="api-error-banner" class="fixed top-2 md:top-6 left-1/2 transform -translate-x-1/2 bg-red-600 text-white font-bold p-3 rounded-xl shadow-2xl z-[999] hidden text-xs md:text-sm w-11/12 max-w-lg border-2 border-red-800 animate-pop text-center"></div>
+
+    <!-- Header (Cố định phía trên) -->
+    <header class="w-full max-w-4xl p-2 md:p-4 flex justify-between items-center z-50 flex-shrink-0 h-[60px] md:h-[80px]">
+        <div class="flex gap-2">
+            <button class="bg-white hover:bg-gray-50 border-b-2 md:border-b-4 border-gray-200 w-10 h-10 md:w-14 md:h-14 rounded-full shadow-md text-amber-600 hover:text-amber-700 transition-all active:translate-y-1 active:border-b-0 flex items-center justify-center" onclick="goHome()">
+                <i class="fa-solid fa-house text-sm md:text-xl"></i>
+            </button>
+            <div class="flex items-center gap-2 cursor-pointer transition-transform hover:scale-105 bg-white/80 backdrop-blur-sm px-3 py-1 md:px-4 md:py-2 rounded-full shadow-md border-b-2 md:border-b-4 border-amber-200 hidden md:flex" onclick="handleTeacherTrigger()">
+                <div class="bg-gradient-to-br from-amber-400 to-orange-500 p-1 md:p-2 rounded-full shadow-inner flex items-center justify-center w-8 h-8 md:w-10 md:h-10">
+                    <i class="fa-solid fa-gear text-white text-sm md:text-lg animate-spin-slow"></i>
+                </div>
+                <span class="font-black text-amber-900 tracking-wider text-sm md:text-xl uppercase">Trạm 3: Đo Lường</span>
+            </div>
+            <button class="bg-white hover:bg-gray-50 border-b-2 border-gray-200 w-10 h-10 rounded-full shadow-md text-gray-600 md:hidden flex items-center justify-center" onclick="handleTeacherTrigger()">
+                <i class="fa-solid fa-gear text-sm animate-spin-slow"></i>
+            </button>
+        </div>
+        
+        <div class="flex gap-2 md:gap-3">
+            <button class="bg-white hover:bg-gray-50 border-b-2 md:border-b-4 border-gray-200 w-10 h-10 md:w-14 md:h-14 rounded-full shadow-md text-gray-600 transition-all active:translate-y-1 active:border-b-0 flex items-center justify-center" onclick="toggleGlobalAudio()">
+                <i id="audio-icon" class="fa-solid fa-volume-high text-sm md:text-xl text-amber-500"></i>
+            </button>
+            <button class="bg-white hover:bg-gray-50 border-b-2 md:border-b-4 border-gray-200 w-10 h-10 md:w-14 md:h-14 rounded-full shadow-md text-gray-600 hover:text-blue-500 transition-all active:translate-y-1 active:border-b-0 flex items-center justify-center" onclick="playCurrentHint()">
+                <i class="fa-solid fa-circle-question text-sm md:text-xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container - Giao diện Game Cũ Mượt mà -->
+    <main id="app-container" class="game-panel w-[96%] max-w-4xl flex-1 mb-2 md:mb-4 overflow-y-auto flex flex-col relative min-h-0">
+        <!-- JS Injects Here -->
+    </main>
+
+    <!-- Teacher Modal -->
+    <div id="teacher-modal" class="hidden fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center backdrop-blur-sm transition-opacity p-2">
+        <div class="game-panel w-full max-w-3xl h-[85vh] md:h-[80vh] p-4 md:p-6 flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl md:text-2xl font-black text-gray-800"><i class="fa-solid fa-chalkboard-user mr-2 text-amber-500"></i>Hồ Sơ Của Thợ Máy</h2>
+                <button onclick="closeTeacherMode()" class="bg-red-100 hover:bg-red-200 text-red-600 w-10 h-10 rounded-full font-black text-xl flex items-center justify-center transition-colors"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="flex border-b-4 border-gray-100 mb-4 overflow-x-auto whitespace-nowrap hide-scrollbar rounded-t-xl">
+                <button class="px-4 py-3 font-black text-amber-700 border-b-4 border-amber-500 bg-amber-50 rounded-t-lg transition-colors" onclick="switchTeacherTab('stats')"><i class="fa-solid fa-chart-pie mr-2"></i>Thành tích</button>
+                <button class="px-4 py-3 font-bold text-gray-500 hover:text-amber-600 hover:bg-gray-50 rounded-t-lg transition-colors" onclick="switchTeacherTab('errors')"><i class="fa-solid fa-bug mr-2"></i>Lịch sử lỗi</button>
+                <button class="px-4 py-3 font-bold text-gray-500 hover:text-amber-600 hover:bg-gray-50 rounded-t-lg transition-colors" onclick="switchTeacherTab('objectives')"><i class="fa-solid fa-bullseye mr-2"></i>Mục tiêu</button>
+            </div>
+
+            <div id="tab-stats" class="flex-1 overflow-y-auto pr-2">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="game-card bg-gradient-to-b from-amber-50 to-white p-4 text-center"><p class="text-sm text-gray-500 font-bold">Điểm số</p><p class="text-5xl font-black text-amber-600" id="tm-avg">0</p></div>
+                    <div class="game-card bg-gradient-to-b from-blue-50 to-white p-4 text-center"><p class="text-sm text-gray-500 font-bold">Thời gian (giây)</p><p class="text-5xl font-black text-blue-600" id="tm-time">0</p></div>
+                    <div class="game-card bg-gradient-to-b from-red-50 to-white p-4 text-center"><p class="text-sm text-gray-500 font-bold">Lượt trượt chân</p><p class="text-5xl font-black text-red-600" id="tm-err-unit">0</p></div>
+                </div>
+                <div class="flex flex-col md:flex-row gap-4 mt-auto border-t-2 border-dashed pt-4">
+                    <button class="btn-game btn-secondary py-3 text-blue-600" onclick="exportData('json')"><i class="fa-solid fa-file-code mr-2"></i> Tải JSON</button>
+                    <button class="btn-game btn-secondary py-3 text-green-600" onclick="exportData('csv')"><i class="fa-solid fa-file-csv mr-2"></i> Tải CSV</button>
+                    <button class="btn-game btn-secondary py-3 text-red-600" onclick="resetData()"><i class="fa-solid fa-trash-can mr-2"></i> Xóa Save</button>
+                </div>
+            </div>
+
+            <div id="tab-errors" class="flex-1 overflow-y-auto hidden pr-2">
+                <ul class="space-y-3" id="tm-error-list"></ul>
+            </div>
+             <div id="tab-objectives" class="flex-1 overflow-y-auto hidden pr-2">
+                <ul class="list-none text-gray-700 space-y-4 font-semibold">
+                    <li class="flex items-start bg-green-50 p-3 rounded-xl border border-green-200">Viết số đo độ dài, khối lượng dạng số thập phân.</li>
+                    <li class="flex items-start bg-green-50 p-3 rounded-xl border border-green-200">Sử dụng Bảng đơn vị để ghim đúng vị trí dấu phẩy.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-slate-900/90 z-[200] flex items-center justify-center backdrop-blur-sm p-2 transition-opacity">
+        <div class="game-panel w-full max-w-md p-6 md:p-8 flex flex-col items-center text-center">
+            <div class="bg-amber-100 w-24 h-24 rounded-full flex items-center justify-center text-6xl mb-6 shadow-inner animate-float border-4 border-amber-300">🤖</div>
+            <h2 class="text-2xl md:text-3xl font-black text-amber-800 mb-2 uppercase">Thẻ Mở Cửa</h2>
+            <p class="text-gray-500 font-bold mb-6">Nhập mã an ninh (admin)</p>
+            <input type="password" id="api-password" class="w-full bg-gray-50 border-b-4 border-2 border-gray-300 rounded-2xl p-4 text-center text-2xl font-black mb-6 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors" placeholder="***">
+            <div class="flex flex-col gap-3 w-full">
+                <button class="w-full btn-game btn-primary py-3 md:py-4 text-lg" onclick="unlockAPI()">Mở Cổng <i class="fa-solid fa-key ml-2"></i></button>
+                <button class="w-full btn-game btn-secondary py-2 text-sm" onclick="skipAuth()">Chơi Thử (Không API)</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA & STATE ---
+        const APP_ID = 'robo_phay_tram3_v1';
+        let isAudioEnabled = true;
+        let currentScreenIndex = 0;
+        let currentStageErrors = 0;
+        let clickCountForTeacher = 0, teacherTimer = null;
+        let currentHintText = "";
+        let sessionStartTime = null;
+        
+        let gcpApiKey = null, currentAudio = null;
+        const ENCRYPTED_PAYLOAD = "YWRtaW58QUl6YVN5Q0hrZElrYy10WklZUGx5emdQTFZ3bXZSSk91T2toeWVF";
+
+        let sessionData = { score: 0, correctAnswers: 0, wrongAnswers: 0, errorsLogged: [], timeSpent: 0 };
+        let globalSpeechId = 0; 
+        let appTimeouts = [];
+
+        function safeSetTimeout(fn, delay) { const id = setTimeout(fn, delay); appTimeouts.push(id); return id; }
+        function clearAppTimeouts() { appTimeouts.forEach(id => clearTimeout(id)); appTimeouts = []; }
+
+        function stopAllAudio() {
+            globalSpeechId++; 
+            if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        }
+
+        let audioCtx = null;
+        function playSFX(type) {
+            if (!isAudioEnabled) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+                if (type === 'correct') { 
+                    osc.type = 'square'; osc.frequency.setValueAtTime(400, now); osc.frequency.setValueAtTime(600, now + 0.1); osc.frequency.setValueAtTime(1000, now + 0.2); 
+                    gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4); osc.start(now); osc.stop(now + 0.4);
+                } else if (type === 'wrong') { 
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(80, now + 0.3);
+                    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3); osc.start(now); osc.stop(now + 0.3);
+                } else if (type === 'click') { 
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1); osc.start(now); osc.stop(now + 0.1);
+                }
+            } catch (e) { console.warn("SFX Error:", e); }
+        }
+
+        const SCREENS = [
+            { id: 'intro', type: 'intro' },
+            { id: 'stairs', type: 'stairs' }, 
+            { 
+                id: 'table_1', type: 'table', 
+                pool: [
+                    { q: "2m 15cm", tar: "m", unitSys: "length", steps: ["2", "1", "5", ""], ans: "2,15", hint: "Số 2 ở m. 15 rải ra dm và cm. Phẩy ở m!" },
+                    { q: "5m 8cm", tar: "m", unitSys: "length", steps: ["5", "0", "8", ""], ans: "5,08", hint: "Điền 0 vào dm bị khuyết. Phẩy ở m." }
+                ]
+            },
+            { 
+                id: 'table_2', type: 'table', 
+                pool: [
+                    { q: "1kg 250g", tar: "kg", unitSys: "mass", steps: ["1", "2", "5", "0"], ans: "1,25", hint: "Phẩy ở kg. Số 0 cuối cùng bỏ đi nhé!" },
+                    { q: "3kg 5g", tar: "kg", unitSys: "mass", steps: ["3", "0", "0", "5"], ans: "3,005", hint: "Khuyết hg và dag! Bù hai số 0. Phẩy ở kg." }
+                ]
+            },
+            { 
+                id: 'drag_1', type: 'drag', 
+                pool: [
+                    { boxes: [{q:"165cm", ans:"1,65 m"}, {q:"275g", ans:"0,275 kg"}, {q:"125m", ans:"0,125 km"}], trucks: ["0,125 km", "1,65 m", "0,275 kg"] },
+                    { boxes: [{q:"205cm", ans:"2,05 m"}, {q:"45g", ans:"0,045 kg"}, {q:"350m", ans:"0,35 km"}], trucks: ["0,35 km", "2,05 m", "0,045 kg"] }
+                ]
+            },
+            { 
+                id: 'real_1', type: 'real', bg:"bg-orange-50",
+                pool: [
+                    { context: "Gói hàng nặng 3kg 5g.", q: "Nhập đúng số kg để tính tiền ship:", ans: "3,005", trap: "3,5" },
+                    { context: "Gói quà nặng 5kg 50g.", q: "Nhập số thập phân (đơn vị kg):", ans: "5,05", trap: "5,5" }
+                ]
+            },
+            { 
+                id: 'speed_1', type: 'speed', 
+                pool: [
+                    { q: "Cảnh báo khẩn! Đổi 132mm ra mét (m)?", opts: ["1,32 m", "0,132 m", "13,2 m"], ans: 1, trapIdx: 0 },
+                    { q: "Hệ thống lỗi! Đổi 9g ra ki-lô-gam (kg)?", opts: ["0,9 kg", "0,09 kg", "0,009 kg"], ans: 2, trapIdx: 0 }
+                ]
+            },
+            { id: 'summary', type: 'summary' }
+        ];
+
+        function showApiError(msg) {
+            const banner = document.getElementById('api-error-banner');
+            banner.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2 text-yellow-300"></i> Google API Lỗi: ${msg}`;
+            banner.classList.remove('hidden');
+            safeSetTimeout(() => banner.classList.add('hidden'), 5000);
+        }
+
+        async function speakText(text) {
+            currentHintText = text;
+            if (!isAudioEnabled) return;
+
+            stopAllAudio(); 
+            const currentSpeechId = globalSpeechId;
+
+            const unitMap = { 'km': 'ki lô mét', 'hm': 'héc tô mét', 'dam': 'đề ca mét', 'm': 'mét', 'dm': 'đề xi mét', 'cm': 'xăng ti mét', 'mm': 'mi li mét', 'kg': 'ki lô gam', 'hg': 'héc tô gam', 'dag': 'đề ca gam', 'g': 'gam' };
+            const unitRegex = new RegExp(`(^|[\\s\\d])(${Object.keys(unitMap).sort((a,b)=>b.length-a.length).join('|')})(?=[^\\p{L}]|$)`, 'giu');
+
+            let pText = text.replace(/(\d),(\d)/g, '$1 phẩy $2').replace(/>/g, ' lớn hơn ').replace(/</g, ' bé hơn ').replace(/=/g, ' bằng ').replace(/Tít tít!/g, '').replace(/Bíp bíp!/g, '').replace(/Úi da!/g, 'Ối!').replace(/Étttt!/g, 'Á!');
+            pText = pText.replace(unitRegex, (match, p1, p2) => p1 + ' ' + unitMap[p2.toLowerCase()] + ' ');
+
+            let useFallback = true; 
+
+            if (gcpApiKey) {
+                try {
+                    const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${gcpApiKey}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ input: { text: pText }, voice: { languageCode: 'vi-VN', name: 'vi-VN-Wavenet-A' }, audioConfig: { audioEncoding: 'MP3', speakingRate: 1.0 } })
+                    });
+                    
+                    if (currentSpeechId !== globalSpeechId) return; 
+
+                    if (res.ok) { 
+                        const d = await res.json(); 
+                        currentAudio = new Audio("data:audio/mp3;base64," + d.audioContent); 
+                        currentAudio.play().catch(e => console.warn("Autoplay chặn", e)); 
+                        useFallback = false; 
+                    } else {
+                        const errData = await res.json();
+                        if(currentSpeechId === globalSpeechId) showApiError(errData.error?.message || "Từ chối API");
+                        gcpApiKey = null; 
+                    }
+                } catch (e) { gcpApiKey = null; }
+            }
+            
+            if (useFallback && 'speechSynthesis' in window) {
+                if (currentSpeechId !== globalSpeechId) return; 
+                const msg = new SpeechSynthesisUtterance(pText); 
+                msg.lang = 'vi-VN'; msg.rate = 1.0; msg.pitch = 1.0;
+                const voices = window.speechSynthesis.getVoices();
+                const viVoice = voices.find(v => v.lang === 'vi-VN' || v.lang === 'vi_VN' || v.lang === 'vi' || v.name.toLowerCase().includes('vietnamese'));
+                if(viVoice) msg.voice = viVoice;
+                window.speechSynthesis.speak(msg);
+            }
+        }
+        
+        function toggleGlobalAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            document.getElementById('audio-icon').className = isAudioEnabled ? 'fa-solid fa-volume-high text-sm md:text-xl text-amber-500' : 'fa-solid fa-volume-xmark text-sm md:text-xl text-gray-400';
+            if(!isAudioEnabled) stopAllAudio(); else speakText("Đã bật âm thanh!");
+        }
+        function playCurrentHint() { if(currentHintText) speakText(currentHintText); }
+
+        function showNextBtn(hideId) { 
+            if(hideId) {
+                const hideEl = document.getElementById(hideId);
+                if(hideEl) hideEl.classList.add('hidden'); 
+            }
+            const skipBtn = document.getElementById('btn-skip');
+            if (skipBtn) skipBtn.classList.add('hidden'); 
+            const nextBtn = document.getElementById('btn-next');
+            if (nextBtn) { nextBtn.classList.remove('hidden'); nextBtn.classList.add('animate-pop'); }
+        }
+
+        function setFeedback(elementId, type, htmlContent) {
+            const fb = document.getElementById(elementId);
+            if(!fb) return;
+            fb.className = `feedback-box fb-${type}`;
+            fb.innerHTML = htmlContent;
+            fb.style.animation = 'none';
+            fb.offsetHeight; 
+            fb.style.animation = null; 
+        }
+
+        function initApp() { 
+            sessionStartTime = new Date();
+            loadTeacherData(); renderScreen(); 
+            playSFX('correct');
+        }
+
+        function goHome() {
+            playSFX('click');
+            if(confirm("Trở về Màn hình chính?\nTiến trình chơi hiện tại sẽ bị xóa.")) {
+                sessionData = { score: 0, correctAnswers: 0, wrongAnswers: 0, errorsLogged: [], timeSpent: 0 };
+                sessionStartTime = new Date();
+                currentScreenIndex = 0; currentStageErrors = 0;
+                stopAllAudio(); clearAppTimeouts(); renderScreen();
+            }
+        }
+
+        function skipStage() {
+            playSFX('click');
+            sessionData.errorsLogged.push({ stage: SCREENS[currentScreenIndex].id, errorType: 'skipped', detail: 'Học sinh bỏ qua vòng này', time: new Date().toISOString() });
+            nextScreen();
+        }
+
+        function nextScreen() { 
+            playSFX('click'); currentStageErrors = 0; 
+            stopAllAudio(); clearAppTimeouts();
+            if (currentScreenIndex < SCREENS.length - 1) { currentScreenIndex++; renderScreen(); } 
+        }
+
+        function prevScreen() { 
+            playSFX('click');
+            if (currentScreenIndex > 0) { 
+                currentScreenIndex--; currentStageErrors = 0; 
+                stopAllAudio(); clearAppTimeouts(); renderScreen(); 
+            } 
+        }
+
+        function renderScreen() {
+            const container = document.getElementById('app-container');
+            const screenData = SCREENS[currentScreenIndex];
+            container.innerHTML = ''; container.scrollTop = 0;
+            
+            if (screenData.pool && !screenData.currentData) {
+                screenData.currentData = screenData.pool[Math.floor(Math.random() * screenData.pool.length)];
+            }
+            const activeData = screenData.currentData || screenData.data || {};
+            if (screenData.bg) activeData.bg = screenData.bg;
+            
+            if(screenData.type === 'intro') renderIntro(container);
+            else if(screenData.type === 'stairs') renderStairs(container);
+            else if(screenData.type === 'table') renderTable(container, activeData);
+            else if(screenData.type === 'drag') renderDrag(container, activeData);
+            else if(screenData.type === 'real') renderReal(container, activeData);
+            else if(screenData.type === 'speed') renderSpeed(container, activeData);
+            else if(screenData.type === 'summary') renderSummary(container);
+        }
+
+        // --- RENDERERS THEO CẤU TRÚC GỐC ---
+        function renderIntro(c) {
+            SCREENS.forEach(s => { if(s.pool) s.currentData = null; });
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col items-center justify-evenly p-4 relative h-full min-h-[400px] bg-cover bg-center" style="background-image: radial-gradient(circle at center, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.2) 100%);">
+                    <div class="z-10 text-[5rem] md:text-[7rem] animate-float drop-shadow-2xl">🤖</div>
+                    <div class="speech-bubble p-4 md:p-8 text-center max-w-xl w-full z-10">
+                        <h1 class="text-2xl md:text-4xl font-black text-amber-600 mb-2 md:mb-4 uppercase tracking-wide">Trạm 3: Đo Lường</h1>
+                        <p class="text-gray-700 font-bold text-sm md:text-xl leading-relaxed">
+                            Tít tít! Chào thợ máy tập sự! 🛠️<br>Giúp tớ đổi đơn vị để dán nhãn số thập phân nhé!
+                        </p>
+                    </div>
+                    <div class="flex flex-col md:flex-row justify-center gap-3 z-10 w-full max-w-md">
+                        <button class="btn-game btn-secondary py-3 md:py-4 px-4 w-full text-amber-700 text-sm md:text-lg" onclick="speakText('Tít tít! Chào thợ máy tập sự! Giúp tớ một tay đổi đúng đơn vị nhé!');">
+                            <i class="fa-solid fa-satellite-dish mr-2 animate-pulse text-amber-500"></i> Nghe bộ đàm
+                        </button>
+                        <button class="btn-game btn-success py-3 md:py-4 px-6 w-full text-lg md:text-xl" onclick="nextScreen()">
+                            <i class="fa-solid fa-power-off mr-2"></i> Khởi Động
+                        </button>
+                    </div>
+                </div>`;
+        }
+
+        function renderStairs(c) {
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-2 md:p-6 h-full justify-between min-h-[400px]">
+                    <div class="text-center shrink-0">
+                        <h2 class="text-xl md:text-3xl font-black text-gray-800 mb-1 uppercase drop-shadow-sm"><i class="fa-solid fa-stairs text-amber-500 mr-2"></i> Bí Kíp Cầu Thang</h2>
+                        <span class="bg-yellow-200 text-yellow-800 font-black px-3 py-1 rounded-full text-xs md:text-base animate-pulse inline-block shadow-sm">👆 Chạm vào cầu thang!</span>
+                    </div>
+                    
+                    <div class="flex flex-row gap-3 md:gap-8 justify-center items-end flex-1 my-4">
+                        <div class="flex flex-col items-center game-card p-3 md:p-6 bg-gradient-to-t from-blue-50 to-white w-1/2">
+                            <div class="bg-blue-500 text-white font-black px-3 py-1 rounded-lg mb-4 shadow-[0_4px_0_#1d4ed8] text-[10px] md:text-lg tracking-wider border-2 border-blue-300">ĐỘ DÀI</div>
+                            <div class="flex items-end cursor-pointer group active:scale-95 transition-all w-full justify-center" onclick="speakText('Mỗi bậc độ dài cách nhau 10 lần nhé. Rơi xuống nhân 10, leo lên chia 10.')">
+                                <div class="w-1/4 h-20 md:h-48 bg-blue-400 text-white font-black flex justify-center pt-2 border-r-2 border-t-2 border-blue-300 rounded-tl-lg text-[10px] md:text-xl">m</div>
+                                <div class="w-1/4 h-16 md:h-36 bg-blue-500 text-white font-black flex justify-center pt-2 border-r-2 border-t-2 border-blue-400 rounded-tl-lg text-[10px] md:text-xl">dm</div>
+                                <div class="w-1/4 h-12 md:h-24 bg-blue-600 text-white font-black flex justify-center pt-2 border-r-2 border-t-2 border-blue-500 rounded-tl-lg text-[10px] md:text-xl">cm</div>
+                                <div class="w-1/4 h-8 md:h-12 bg-blue-700 text-white font-black flex justify-center pt-1 border-t-2 border-blue-600 rounded-tl-lg text-[8px] md:text-lg">mm</div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col items-center game-card p-3 md:p-6 bg-gradient-to-t from-orange-50 to-white w-1/2">
+                            <div class="bg-orange-500 text-white font-black px-3 py-1 rounded-lg mb-4 shadow-[0_4px_0_#c2410c] text-[10px] md:text-lg tracking-wider border-2 border-orange-300">KHỐI LƯỢNG</div>
+                            <div class="flex items-end cursor-pointer group active:scale-95 transition-all w-full justify-center" onclick="speakText('Khối lượng cũng chung một băng đảng với độ dài! Liền kề hơn kém 10 lần nha!')">
+                                <div class="w-1/4 h-20 md:h-48 bg-orange-400 text-white font-black flex justify-center pt-2 border-r-2 border-t-2 border-orange-300 rounded-tl-lg text-[10px] md:text-xl">tấn</div>
+                                <div class="w-1/4 h-16 md:h-36 bg-orange-500 text-white font-black flex justify-center pt-2 border-r-2 border-t-2 border-orange-400 rounded-tl-lg text-[10px] md:text-xl">tạ</div>
+                                <div class="w-1/4 h-12 md:h-24 bg-orange-600 text-white font-black flex justify-center pt-2 border-r-2 border-t-2 border-orange-500 rounded-tl-lg text-[10px] md:text-xl">yến</div>
+                                <div class="w-1/4 h-8 md:h-12 bg-orange-700 text-white font-black flex justify-center pt-1 border-t-2 border-orange-600 rounded-tl-lg text-[8px] md:text-lg">kg</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 justify-between w-full pt-4 border-t-2 border-gray-100 shrink-0">
+                        <button class="btn-game btn-secondary text-gray-500 py-2 md:py-3 w-14 md:w-20" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button class="btn-game btn-warning flex-1 text-xs md:text-base py-2 md:py-3" onclick="skipStage()">Bỏ qua <i class="fa-solid fa-forward ml-1"></i></button>
+                        <button class="btn-game btn-primary flex-[2] py-2 md:py-3 text-sm md:text-xl" onclick="nextScreen()">Đã Hiểu <i class="fa-solid fa-check ml-1"></i></button>
+                    </div>
+                </div>`;
+            safeSetTimeout(()=>speakText("Chạm vào cầu thang để nghe lén bí mật của chúng nó!"), 500);
+        }
+
+        function renderTable(c, d) {
+            const headers = d.unitSys === "length" ? ["m", "dm", "cm", "mm"] : ["kg", "hg", "dag", "g"];
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-2 md:p-6 h-full justify-between min-h-[500px]">
+                    <h2 class="text-xl md:text-3xl font-black mb-3 text-center text-gray-800 uppercase drop-shadow-sm shrink-0"><i class="fa-solid fa-microchip text-indigo-500 mr-2 animate-pulse"></i> Phân Tích Lượng Tử</h2>
+                    
+                    <div class="game-card bg-slate-50 p-4 md:p-8 w-full max-w-2xl mx-auto flex-1 flex flex-col justify-evenly">
+                        <div class="text-center bg-white p-3 rounded-xl border-2 border-gray-200 shadow-sm relative overflow-hidden shrink-0">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500"></div>
+                            <p class="text-gray-400 font-black text-[10px] md:text-sm mb-1 uppercase tracking-widest">Đầu vào</p>
+                            <p class="text-2xl md:text-4xl font-black text-indigo-700 tracking-tight">${d.q} <span class="text-gray-300 mx-2">👉</span> ... ${d.tar}</p>
+                        </div>
+
+                        <div class="grid grid-cols-4 mx-auto w-full bg-amber-50 p-2 md:p-4 rounded-xl border-4 border-amber-200 shadow-inner relative my-4 shrink-0" id="u-table">
+                            <div class="absolute -top-3 right-0 md:-right-2 bg-amber-500 text-white text-[9px] md:text-xs font-black px-2 py-1 rounded shadow transform rotate-12 z-20">Khuôn</div>
+                            ${headers.map(h => `<div class="unit-header text-sm md:text-xl py-1 md:py-2 ${h===d.tar ? 'from-green-400 to-green-500 text-white border-green-600':''}">${h}</div>`).join('')}
+                            ${headers.map(h => `<div class="unit-cell h-10 md:h-16 text-xl md:text-3xl flex items-center justify-center font-mono text-gray-800 shadow-inner bg-gray-50 mx-1 border-x border-b-2" id="cell-${h}"></div>`).join('')}
+                        </div>
+
+                        <div class="flex justify-center mb-4 shrink-0">
+                            <button id="btn-sim" class="btn-game bg-cyan-400 hover:bg-cyan-300 text-cyan-900 border-2 border-cyan-500 shadow-[0_4px_0_#0891b2] py-2 px-6 text-xs md:text-base" onclick="simulateTable('${d.unitSys}', '${d.steps.join(',')}', '${d.tar}')">
+                                <i class="fa-solid fa-wand-magic-sparkles mr-2 text-yellow-300"></i> Xem Mẫu
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-2 md:gap-3 justify-center bg-gray-100 p-3 md:p-4 rounded-xl border-2 border-gray-200 shrink-0">
+                            <span class="text-gray-500 font-bold text-xs md:text-sm uppercase hidden md:inline">Kết quả:</span>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="t-input" inputmode="decimal" class="w-24 md:w-32 border-4 border-gray-300 rounded-xl p-2 text-center text-xl md:text-3xl font-black text-indigo-900 focus:border-indigo-500 focus:outline-none shadow-inner bg-white" placeholder="0,00">
+                                <span class="text-xl md:text-3xl font-black text-white bg-indigo-500 px-3 py-2 md:py-3 rounded-xl shadow-md">${d.tar}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="t-fb" class="hidden shrink-0 mt-4"></div>
+
+                    <div class="flex gap-2 justify-between w-full pt-4 border-t-2 border-gray-100 mt-2 shrink-0">
+                        <button class="btn-game btn-secondary text-gray-500 py-2 md:py-3 w-14 md:w-20" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button id="btn-skip" class="btn-game btn-warning flex-1 py-2 md:py-3 text-xs md:text-base" onclick="skipStage()">Bỏ qua <i class="fa-solid fa-forward ml-1"></i></button>
+                        <button id="btn-chk" class="btn-game btn-primary flex-[2] py-2 md:py-3 text-sm md:text-xl" onclick="chkTable('${d.ans}', '${d.hint}')">Kiểm Tra <i class="fa-solid fa-stamp ml-1"></i></button>
+                        <button id="btn-next" class="btn-game btn-success flex-[2] hidden py-2 md:py-3 text-sm md:text-xl" onclick="nextScreen()">Tiếp Theo <i class="fa-solid fa-forward ml-1"></i></button>
+                    </div>
+                </div>`;
+            document.getElementById('t-input').oninput = function(){ this.value = this.value.replace(/\./g,',').replace(/[^0-9,]/g,''); };
+            safeSetTimeout(()=>speakText(`Hãy điền số để đổi ra đơn vị ${d.tar} nhé.`), 500);
+        }
+
+        function simulateTable(sys, stepsStr, tar) {
+            const btn = document.getElementById('btn-sim');
+            if (btn.disabled) return; 
+            playSFX('click');
+            const steps = stepsStr.split(',');
+            const cells = sys === "length" ? ['m', 'dm', 'cm', 'mm'] : ['kg', 'hg', 'dag', 'g'];
+            cells.forEach(c => { document.getElementById('cell-'+c).innerText = ''; document.getElementById('cell-'+c).classList.remove('highlight-col'); });
+            let timeOffset = 200;
+            steps.forEach((val, index) => {
+                if(val !== "") {
+                    safeSetTimeout(() => { 
+                        playSFX('click'); document.getElementById('cell-'+cells[index]).innerText = val; 
+                    }, timeOffset);
+                    timeOffset += 300;
+                }
+            });
+            safeSetTimeout(()=>{
+                playSFX('correct');
+                const targetCell = sys === 'length' ? 'm' : 'kg';
+                document.getElementById('cell-'+targetCell).classList.add('highlight-col');
+                speakText("Chú ý cột màu vàng nhé! Dấu phẩy đặt ở đó!");
+            }, timeOffset + 100);
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-check text-green-600 mr-2"></i> Đã nạp mẫu';
+        }
+
+        function chkTable(ans, hint) {
+            const val = document.getElementById('t-input').value.trim();
+            const inputEl = document.getElementById('t-input');
+            const fbContainer = document.getElementById('t-fb');
+            fbContainer.classList.remove('hidden');
+
+            if(!val) {
+                inputEl.focus(); inputEl.classList.add('shake-error'); safeSetTimeout(()=>inputEl.classList.remove('shake-error'),500);
+                playSFX('wrong'); setFeedback('t-fb', 'error', 'Giấy nhãn đang trống trơn kìa!');
+                return speakText("Giấy nhãn đang trống trơn kìa!");
+            }
+
+            if(parseFloat(val.replace(',','.')) === parseFloat(ans.replace(',','.'))) {
+                playSFX('correct'); inputEl.classList.add('bg-green-50', 'border-green-400', 'text-green-700');
+                setFeedback('t-fb', 'success', '<i class="fa-solid fa-star text-yellow-500 mr-2"></i> Dấu phẩy đặt chuẩn!');
+                sessionData.score+=10; showNextBtn('btn-chk');
+                speakText("Tuyệt cú mèo! Dấu phẩy đặt chuẩn!");
+            } else {
+                playSFX('wrong'); currentStageErrors++; sessionData.wrongAnswers++;
+                inputEl.classList.add('shake-error'); safeSetTimeout(()=>inputEl.classList.remove('shake-error'),500);
+                
+                if(currentStageErrors === 1) {
+                    setFeedback('t-fb', 'error', 'Sai rồi. Bấm [Xem Mẫu] đi!');
+                    speakText("Sai rồi. Thử xem tớ làm mẫu nhé!");
+                } else if(currentStageErrors === 2) {
+                    setFeedback('t-fb', 'hint', `<strong>Gợi ý:</strong> ${hint}`);
+                    speakText("Gợi ý mật cho cậu: " + hint);
+                    logError('table', 'comma_placement', 'Sai dấu phẩy');
+                } else {
+                    setFeedback('t-fb', 'error', `Đáp án đúng là <strong class="text-lg ml-1">${ans}</strong>.`);
+                    speakText(`Hệ thống bốc hỏa! Đáp án phải là ${ans}.`);
+                    inputEl.value = ans; showNextBtn('btn-chk');
+                }
+            }
+            saveTeacherData();
+        }
+
+        function renderDrag(c, d) {
+            const boxes = d.boxes.map((b, i) => `
+                <div class="drag-card bg-amber-50 border-b-4 border-amber-400 p-2 md:p-3 rounded-xl shadow-sm font-black text-amber-900 text-center w-[30%] max-w-[120px] shrink-0 hover:bg-amber-100 flex flex-col justify-center gap-1" draggable="true" data-ans="${b.ans}">
+                    <i class="fa-solid fa-box text-amber-600 text-3xl md:text-4xl drop-shadow-md"></i>
+                    <span class="text-[10px] md:text-sm leading-tight">${b.q}</span>
+                </div>`).join('');
+            
+            const trucks = d.trucks.map((t, i) => `
+                <div class="flex flex-col items-center w-[30%]">
+                    <div class="drop-zone w-full max-w-[5rem] md:max-w-[7rem] h-14 md:h-20 bg-gray-200 border-4 border-gray-400 rounded-xl mb-2 flex items-center justify-center shadow-inner relative" data-t="${t}">
+                        <i class="fa-solid fa-arrow-down text-gray-400 opacity-50 absolute top-2 animate-bounce"></i>
+                    </div>
+                    <div class="bg-slate-800 text-white font-black px-1 py-2 rounded-lg text-[9px] md:text-sm w-full text-center border-b-4 border-slate-900 truncate">
+                        ${t}
+                    </div>
+                </div>`).join('');
+
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-2 md:p-6 h-full justify-between min-h-[450px]">
+                    <div class="text-center mb-3 shrink-0">
+                        <h2 class="text-xl md:text-3xl font-black text-gray-800 mb-1 uppercase drop-shadow-sm"><i class="fa-solid fa-conveyor-belt text-amber-500 mr-2"></i> Băng Chuyền</h2>
+                        <span class="bg-blue-100 text-blue-800 font-bold px-4 py-1 rounded-full text-[10px] md:text-sm border border-blue-200">Kéo thùng hàng vào đúng xe!</span>
+                    </div>
+
+                    <div class="game-card flex justify-center gap-2 md:gap-4 mb-4 p-3 md:p-4 bg-gradient-to-b from-gray-50 to-gray-100 relative z-20 shrink-0" id="box-dock">
+                        <div class="absolute -top-3 right-4 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded border-b-2 border-red-700 shadow transform rotate-6">Chờ xuất</div>
+                        ${boxes}
+                    </div>
+
+                    <div class="game-card p-2 bg-gradient-to-b from-gray-100 to-gray-200 relative overflow-hidden flex-1 flex flex-col justify-end min-h-[160px] md:min-h-[200px]">
+                        <div class="absolute bottom-6 left-0 w-full h-6 conveyor-belt"></div>
+                        <div class="absolute bottom-3 left-0 w-full h-3 bg-gray-800"></div>
+                        <div class="flex flex-row justify-evenly gap-1 relative z-10 pb-8 w-full px-1">
+                            ${trucks}
+                        </div>
+                    </div>
+
+                    <div id="d-fb" class="hidden shrink-0 mt-4"></div>
+                    
+                    <div class="flex gap-2 justify-between w-full pt-4 border-t-2 border-gray-100 mt-2 shrink-0">
+                        <button class="btn-game btn-secondary text-gray-500 py-2 md:py-3 w-14 md:w-20" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button id="btn-skip" class="btn-game btn-warning flex-1 py-2 md:py-3 text-xs md:text-base" onclick="skipStage()">Bỏ qua <i class="fa-solid fa-forward ml-1"></i></button>
+                        <button id="btn-chk" class="btn-game btn-primary flex-[2] py-2 md:py-3 text-sm md:text-xl" onclick="chkDragPack()">Xuất Hàng <i class="fa-solid fa-truck-fast ml-1"></i></button>
+                        <button id="btn-next" class="btn-game btn-success flex-[2] hidden py-2 md:py-3 text-sm md:text-xl" onclick="nextScreen()">Sang Khu Mới <i class="fa-solid fa-person-walking-arrow-right ml-1"></i></button>
+                    </div>
+                </div>`;
+
+            let dragged = null; selectedDragBox = null;
+            document.querySelectorAll('.drag-card').forEach(el => {
+                el.ondragstart = function(e){ dragged = this; e.dataTransfer.setData('text/plain', ''); playSFX('click'); safeSetTimeout(()=>this.style.opacity='0.5',0); };
+                el.ondragend = function(){ this.style.opacity='1'; dragged=null; };
+                el.onclick = function(e) {
+                    e.stopPropagation();
+                    if(selectedDragBox === this) { this.classList.remove('selected'); selectedDragBox = null; return; }
+                    if(selectedDragBox) selectedDragBox.classList.remove('selected');
+                    selectedDragBox = this; this.classList.add('selected'); playSFX('click');
+                    if(this.parentNode.classList.contains('drop-zone')) { document.getElementById('box-dock').appendChild(this); this.classList.remove('selected'); selectedDragBox = null; }
+                };
+            });
+            document.querySelectorAll('.drop-zone').forEach(z => {
+                z.ondragover = e => { e.preventDefault(); z.classList.add('drag-over'); };
+                z.ondragleave = () => z.classList.remove('drag-over');
+                z.ondrop = function(e) { e.preventDefault(); this.classList.remove('drag-over'); if(dragged) handleDropToZone(dragged, this); };
+                z.onclick = function(e) {
+                    e.stopPropagation();
+                    if(selectedDragBox) { handleDropToZone(selectedDragBox, this); selectedDragBox.classList.remove('selected'); selectedDragBox = null; } 
+                    else if (this.children.length > 1) { const box = this.querySelector('.drag-card'); if(box) { document.getElementById('box-dock').appendChild(box); playSFX('click'); } }
+                };
+            });
+            const dock = document.getElementById('box-dock');
+            dock.ondragover = e => e.preventDefault();
+            dock.ondrop = function(e) { e.preventDefault(); if(dragged) this.appendChild(dragged); playSFX('click');};
+            dock.onclick = function() { if(selectedDragBox) { this.appendChild(selectedDragBox); selectedDragBox.classList.remove('selected'); selectedDragBox = null; playSFX('click'); } };
+            
+            safeSetTimeout(() => speakText('Xếp 3 thùng lên 3 xe đúng kẻo đền tiền nha!'), 500);
+        }
+
+        function handleDropToZone(box, zone) {
+            const existingBox = zone.querySelector('.drag-card');
+            if(existingBox) document.getElementById('box-dock').appendChild(existingBox);
+            zone.appendChild(box); playSFX('click');
+            const arrow = zone.querySelector('.fa-arrow-down');
+            if(arrow) arrow.style.display = 'none';
+        }
+
+        function chkDragPack() {
+            let ok = true, placedCount = 0;
+            const totalBoxes = document.querySelectorAll('.drag-card').length;
+            document.querySelectorAll('.drop-zone').forEach(z => {
+                const box = z.querySelector('.drag-card');
+                if(box) { placedCount++; if(box.dataset.ans !== z.dataset.t) ok = false; } 
+            });
+
+            const fbContainer = document.getElementById('d-fb'); fbContainer.classList.remove('hidden');
+            if(placedCount < totalBoxes) {
+                setFeedback('d-fb', 'error', 'Vẫn còn thùng hàng chưa lên xe kìa!');
+                playSFX('wrong'); return speakText("Vẫn còn thùng hàng ở khu vực chờ kìa!");
+            }
+            if(ok) {
+                playSFX('correct'); setFeedback('d-fb', 'success', '<i class="fa-solid fa-truck-fast text-xl mr-2 animate-bounce"></i> Xe đã xuất phát!');
+                sessionData.score+=15; showNextBtn('btn-chk');
+                document.querySelectorAll('.drag-card').forEach(el => { el.draggable = false; el.onclick = null; el.classList.add('cursor-default', 'opacity-80'); });
+                document.querySelectorAll('.drop-zone').forEach(z => z.onclick = null);
+                speakText("Còi xe vang lên! Hàng đi đúng chuyến rồi.");
+            } else {
+                playSFX('wrong'); currentStageErrors++; sessionData.wrongAnswers++;
+                setFeedback('d-fb', 'error', '<i class="fa-solid fa-triangle-exclamation mr-2"></i> Có thùng lên nhầm xe, đổi lại mau!');
+                speakText("Étttt! Có thùng lên nhầm xe rồi!"); logError('drag_pack', 'unit_conversion', 'Xếp nhầm xe tải');
+            }
+            saveTeacherData();
+        }
+
+        function renderReal(c, d) {
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-2 md:p-8 h-full justify-between min-h-[400px] ${d.bg}">
+                    <div class="text-center mb-8 shrink-0">
+                        <h2 class="text-xl md:text-3xl font-black text-gray-800 mb-2 uppercase drop-shadow-sm"><i class="fa-solid fa-scale-balanced text-orange-500 mr-2"></i> Thực Chiến</h2>
+                        <span class="bg-orange-200 text-orange-800 font-bold px-4 py-1 rounded-full text-xs md:text-sm border border-orange-300">Ghi nhanh số thập phân!</span>
+                    </div>
+                    
+                    <div class="flex flex-col md:flex-row gap-6 md:gap-8 items-center justify-center flex-1 w-full">
+                        <div class="relative flex flex-col items-center group">
+                            <div class="absolute -top-12 md:-top-16 z-20 animate-float drop-shadow-2xl transition-transform group-hover:scale-110"><i class="fa-solid fa-box-open text-6xl md:text-7xl text-amber-600"></i></div>
+                            <div class="bg-gradient-to-b from-gray-200 to-gray-300 w-48 h-28 md:h-36 rounded-3xl border-b-8 border-gray-400 flex flex-col justify-end items-center pb-4 shadow-xl relative overflow-hidden">
+                                <div class="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_#22c55e]"></div>
+                                <div class="bg-black text-green-400 font-mono text-xl font-black px-4 py-2 rounded-lg border-4 border-gray-600 shadow-inner tracking-widest text-center truncate w-11/12">${d.context.match(/\d+kg \d+g/)?.[0] || d.context.match(/\d+m \d+cm/)?.[0] || "Dữ liệu cân"}</div>
+                                <span class="text-gray-500 text-[8px] font-black mt-2 tracking-widest">CÂN ĐIỆN TỬ</span>
+                            </div>
+                        </div>
+
+                        <div class="game-card p-4 md:p-6 w-full max-w-xs bg-white border-orange-300 relative">
+                            <p class="font-bold text-gray-700 text-sm md:text-base mb-4 leading-relaxed"><i class="fa-solid fa-quote-left text-orange-200 text-xl mr-2"></i>${d.context} ${d.q}</p>
+                            <div class="flex items-center gap-2 justify-center bg-orange-50 p-3 rounded-xl border border-orange-100">
+                                <div class="relative flex-1">
+                                    <i class="fa-solid fa-pen absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-300"></i>
+                                    <input type="text" inputmode="decimal" id="r-input" class="w-full border-b-4 border-2 border-gray-300 rounded-xl py-2 pl-10 pr-2 text-xl font-black text-center text-orange-900 focus:border-orange-500 focus:outline-none shadow-inner" placeholder="0,00">
+                                </div>
+                                <span class="text-xl font-black text-orange-600 bg-white px-3 py-2 rounded-xl border border-orange-200 shadow-sm">${d.ans.includes('kg') ? 'kg' : (d.tar || 'kg')}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="r-fb" class="hidden mt-4 shrink-0"></div>
+                    
+                    <div class="flex gap-2 justify-between w-full pt-4 border-t-2 border-gray-100 mt-2 shrink-0">
+                        <button class="btn-game btn-secondary text-gray-500 py-2 md:py-3 w-14 md:w-20" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button id="btn-skip" class="btn-game btn-warning flex-1 py-2 md:py-3 text-xs md:text-base" onclick="skipStage()">Bỏ qua <i class="fa-solid fa-forward ml-1"></i></button>
+                        <button id="btn-chk" class="btn-game btn-primary flex-[2] py-2 md:py-3 text-sm md:text-xl" onclick="chkReal('${d.ans}', '${d.trap}')">In Hóa Đơn <i class="fa-solid fa-print ml-1"></i></button>
+                        <button id="btn-next" class="btn-game btn-success flex-[2] hidden py-2 md:py-3 text-sm md:text-xl" onclick="nextScreen()">Lãnh Lương <i class="fa-solid fa-sack-dollar ml-1"></i></button>
+                    </div>
+                </div>`;
+            document.getElementById('r-input').oninput = function(){ this.value = this.value.replace(/\./g,',').replace(/[^0-9,]/g,''); };
+            if(window.innerWidth > 768) document.getElementById('r-input').focus();
+            safeSetTimeout(() => speakText(d.context + " " + d.q), 500);
+        }
+
+        function chkReal(ans, trap) {
+            const val = document.getElementById('r-input').value.trim();
+            const inputEl = document.getElementById('r-input');
+            const fbContainer = document.getElementById('r-fb');
+            fbContainer.classList.remove('hidden');
+
+            if(!val) {
+                inputEl.focus(); playSFX('wrong'); setFeedback('r-fb', 'error', 'Chưa nhập số liệu!');
+                return speakText("Chưa nhập số liệu! Cậu định miễn phí cho khách à?");
+            }
+
+            if(val === ans) {
+                playSFX('correct'); inputEl.classList.add('bg-green-50', 'border-green-400', 'text-green-700');
+                setFeedback('r-fb', 'success', '<i class="fa-solid fa-receipt text-xl mr-2"></i> Hóa đơn chuẩn xác!');
+                sessionData.score+=15; showNextBtn('btn-chk'); speakText("Hóa đơn in ra chuẩn xác!");
+            } else {
+                playSFX('wrong'); currentStageErrors++; sessionData.wrongAnswers++;
+                inputEl.classList.add('shake-error'); safeSetTimeout(()=>inputEl.classList.remove('shake-error'),500);
+                if(val === trap) {
+                    setFeedback('r-fb', 'error', `Suýt sập bẫy! Phần dư nhỏ phải nằm ở phần nghìn nhé!`);
+                    speakText("Suýt sập bẫy! Nhớ này: 1 ki lô gam bằng 1000 gam.");
+                    logError('real', 'missed_zeros', `Bẫy -> ${trap}`);
+                } else if (currentStageErrors === 1) {
+                    setFeedback('r-fb', 'error', 'Cái cân khóc ròng rùi 😭. Nhẩm lại bảng đơn vị đi!');
+                    speakText("Cậu nhẩm lại các cột đơn vị xem nào!");
+                } else {
+                    setFeedback('r-fb', 'hint', `<strong>Phao cứu sinh:</strong> Đáp án là <strong class="text-lg text-orange-600">${ans}</strong>.`);
+                    speakText(`Đáp án đúng là ${ans}.`); inputEl.value = ans; showNextBtn('btn-chk');
+                }
+            }
+            saveTeacherData();
+        }
+
+        function renderSpeed(c, d) {
+            const opts = d.opts.map((o, i) => `
+                <button class="bg-white border-b-4 md:border-b-8 border-2 border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50 active:-translate-y-0 active:border-b-2 py-4 px-4 rounded-xl md:rounded-3xl text-xl md:text-3xl font-black text-indigo-800 transition-all shadow-md w-full" onclick="chkSpeed(${i}, ${d.ans}, ${d.trapIdx}, this)">
+                    ${o}
+                </button>
+            `).join('');
+
+            // Đã trả lại toàn bộ thanh điều hướng có nút Bỏ qua ở dưới cùng.
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-4 md:p-8 h-full bg-gradient-to-br from-indigo-500 via-purple-600 to-indigo-900 relative overflow-y-auto justify-between rounded-2xl md:rounded-3xl min-h-[450px]">
+                    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+CjxyZWN0IHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgZmlsbD0ibm9uZSI+PC9yZWN0Pgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIyIiBmaWxsPSJyZ2JhKDI1NSwgMjU1LCAyNTUsIDAuMSkiPjwvY2lyY2xlPgo8L3N2Zz4=')] opacity-30 pointer-events-none"></div>
+                    <i class="fa-solid fa-ghost text-white/10 text-[8rem] md:text-[15rem] absolute -right-4 md:-right-10 -top-4 md:-top-10 pointer-events-none transform rotate-12"></i>
+                    
+                    <div class="flex-1 flex flex-col justify-center max-w-xl mx-auto w-full z-10">
+                        <h2 class="text-2xl md:text-4xl font-black text-yellow-300 mb-6 text-center uppercase tracking-widest drop-shadow-[0_0_10px_rgba(253,224,71,0.5)]"><i class="fa-solid fa-bolt text-yellow-400 mr-2 animate-pulse"></i> Đại chiến Boss</h2>
+                        
+                        <div class="bg-white/95 backdrop-blur p-4 md:p-8 text-center border-b-[8px] md:border-b-[10px] border-indigo-300 shadow-2xl relative rounded-2xl md:rounded-3xl">
+                            <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-1 rounded-full font-black text-[10px] md:text-sm shadow-lg border-2 border-red-800 animate-bounce whitespace-nowrap">CẢNH BÁO LỪA ĐẢO</div>
+                            <p class="text-lg md:text-2xl font-black text-gray-800 mb-6 leading-tight">${d.q}</p>
+                            <div class="flex flex-col gap-3" id="sp-opts">${opts}</div>
+                        </div>
+
+                        <div id="sp-fb" class="hidden w-full mt-4"></div>
+                    </div>
+                    
+                    <div class="flex gap-2 justify-between w-full pt-4 z-10 border-t-2 border-indigo-400/50 mt-4 shrink-0">
+                        <button class="btn-game btn-secondary text-gray-500 py-2 md:py-3 w-14 md:w-20" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button id="btn-skip" class="btn-game btn-warning flex-1 py-2 md:py-3 text-xs md:text-base" onclick="skipStage()">Bỏ chạy <i class="fa-solid fa-person-running ml-1"></i></button>
+                        <button id="btn-next" class="btn-game btn-success flex-[2] hidden py-2 md:py-3 text-sm md:text-xl shadow-[0_4px_0_#16a34a]" onclick="nextScreen()">Tấn Công <i class="fa-solid fa-rocket ml-2"></i></button>
+                    </div>
+                </div>`;
+            safeSetTimeout(()=>speakText("Cảnh báo! Boss cuối xuất hiện! Nó lừa đảo lắm. Đọc kĩ đề nha!"), 500);
+        }
+
+        function chkSpeed(sel, ans, trap, btn) {
+            const fbContainer = document.getElementById('sp-fb');
+            fbContainer.classList.remove('hidden');
+
+            if(sel === ans) {
+                playSFX('correct'); 
+                btn.classList.remove('border-indigo-200', 'hover:border-indigo-400', 'hover:bg-indigo-50'); 
+                btn.classList.add('bg-green-400', 'text-white', 'border-green-600');
+                document.querySelectorAll('#sp-opts button').forEach(b => { if (b !== btn) b.classList.add('opacity-30', 'pointer-events-none'); });
+                
+                setFeedback('sp-fb', 'success', '<i class="fa-solid fa-trophy mr-2 text-yellow-500 text-xl"></i> Boss đã bị tiêu diệt!');
+                sessionData.score+=20; document.getElementById('sp-opts').classList.add('pointer-events-none'); 
+                showNextBtn('btn-skip'); speakText("BÙM! Đánh bại Boss xuất sắc!");
+            } else {
+                playSFX('wrong'); btn.classList.add('shake-error'); safeSetTimeout(()=>btn.classList.remove('shake-error'),500);
+                if(sel === trap) {
+                    setFeedback('sp-fb', 'error', 'Ui cha! Đọc kĩ đơn vị cần tìm nha! 🧐');
+                    speakText("Bị lừa rồi! Đề bài hỏi đơn vị khác cơ mà."); logError('speed', 'wrong_target_unit', 'Sập bẫy');
+                } else {
+                    setFeedback('sp-fb', 'error', 'Trượt rồi! Nhẩm lại bảng đơn vị nhé!');
+                    speakText("Trượt rồi! Lùi lộn số dấu phẩy rồi.");
+                }
+            }
+            saveTeacherData();
+        }
+
+        function renderSummary(c) {
+            playSFX('correct'); 
+            const timeDiff = Math.floor((new Date() - sessionStartTime) / 1000); sessionData.timeSpent += timeDiff;
+            const min = Math.floor(sessionData.timeSpent / 60); const sec = sessionData.timeSpent % 60;
+            
+            // XỬ LÝ LỖI LOGIC: BỎ QUA KHÔNG ĐƯỢC 10/10 NỮA
+            let h = ""; 
+            const e = sessionData.errorsLogged.map(x=>x.errorType);
+            const skipCount = e.filter(type => type === 'skipped').length;
+            
+            if(e.includes('comma_placement')) h+="<li class='bg-yellow-50 p-2 md:p-3 rounded-lg border border-yellow-200 text-xs md:text-sm'><i class='fa-solid fa-pen-ruler text-amber-500 mr-2'></i> Kẻ bảng đơn vị ra nháp để đặt phẩy.</li>";
+            if(e.includes('missed_zeros')) h+="<li class='bg-yellow-50 p-2 md:p-3 rounded-lg border border-yellow-200 text-xs md:text-sm'><i class='fa-solid fa-0 text-amber-500 mr-2'></i> Nhớ bù số 0 vào cột trống.</li>";
+            if(e.includes('wrong_target_unit')) h+="<li class='bg-yellow-50 p-2 md:p-3 rounded-lg border border-yellow-200 text-xs md:text-sm'><i class='fa-solid fa-glasses text-amber-500 mr-2'></i> Đọc kĩ đề bắt đổi ra đơn vị gì nha.</li>";
+            
+            if(skipCount > 0) {
+                h += `<li class='bg-gray-100 p-2 md:p-3 rounded-lg border border-gray-300 text-gray-600 text-xs md:text-sm'><i class='fa-solid fa-forward-step mr-2'></i> Bỏ qua ${skipCount} thử thách. Lần sau dũng cảm lên nhé!</li>`;
+            }
+
+            // Điểm hoàn hảo
+            if(!h && sessionData.score > 0) {
+                h="<li class='bg-green-50 p-3 rounded-lg border border-green-200 text-green-700 font-black text-center text-sm md:text-base'><i class='fa-solid fa-star text-green-500 mr-2 text-xl'></i> 10/10! Cậu không có điểm yếu nào cả!</li>";
+            } else if (!h && sessionData.score === 0) {
+                h="<li class='bg-gray-50 p-3 rounded-lg border border-gray-200 text-gray-500 font-bold text-center text-sm md:text-base'>Chưa hoàn thành thử thách nào! Lần sau cố lên!</li>";
+            }
+
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col items-center justify-center p-4 md:p-8 bg-gradient-to-b from-green-300 to-green-600 h-full relative overflow-y-auto">
+                    <div class="absolute inset-0 pointer-events-none opacity-30 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCI+PHBvbHlnb24gcG9pbnRzPSIyNSwwIDI5LDE0IDQ0LDE0IDMyLDIzIDM3LDM4IDI1LDI4IDEzLDM4IDE4LDIzIDYsMTQgMjEsMTQiIGZpbGw9IiNGRkQiLz48L3N2Zz4=')]"></div>
+
+                    <div class="bg-white px-6 py-2 rounded-full mb-6 shadow-lg z-10 animate-bounce mt-4 md:mt-0 shrink-0">
+                        <h1 class="text-xl md:text-3xl font-black text-green-600 uppercase tracking-widest text-center">TỐT NGHIỆP! 🎉</h1>
+                    </div>
+
+                    <div class="game-panel w-full max-w-sm md:max-w-md p-4 md:p-6 relative z-10 border-green-300 shrink-0">
+                        <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-yellow-400 rounded-full border-4 border-white flex items-center justify-center shadow-xl z-20"><i class="fa-solid fa-medal text-3xl text-white"></i></div>
+
+                        <div class="grid grid-cols-2 gap-3 mt-6 mb-4">
+                            <div class="bg-gradient-to-b from-amber-50 to-amber-100 p-3 rounded-xl text-center border-b-2 border-amber-300 shadow-sm">
+                                <p class="text-amber-800 font-black mb-1 text-[10px] md:text-xs uppercase">Điểm Số</p>
+                                <p class="text-3xl font-black text-amber-500 drop-shadow">${sessionData.score}</p>
+                            </div>
+                            <div class="bg-gradient-to-b from-blue-50 to-blue-100 p-3 rounded-xl text-center border-b-2 border-blue-300 shadow-sm">
+                                <p class="text-blue-800 font-black mb-1 text-[10px] md:text-xs uppercase">Thời Gian</p>
+                                <p class="text-2xl font-black text-blue-500 drop-shadow mt-1">${min}<span class="text-sm">p</span> ${sec}<span class="text-sm">s</span></p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-xl p-3 border-2 border-dashed border-gray-300">
+                            <h3 class="font-black text-gray-800 text-sm mb-2 flex items-center"><i class="fa-solid fa-comment-dots text-indigo-500 text-lg mr-2"></i> Lời phê:</h3>
+                            <ul class="list-none space-y-2 font-semibold text-gray-700">${h}</ul>
+                        </div>
+                    </div>
+
+                    <button class="mt-6 mb-2 btn-game btn-success text-sm md:text-lg py-3 px-8 shadow-[0_6px_0_#16a34a] hover:-translate-y-1 active:translate-y-1 z-10 animate-pop shrink-0" onclick="location.reload()">
+                        <i class="fa-solid fa-rotate-right mr-2"></i> Chơi Lại Cày Điểm!
+                    </button>
+                </div>`;
+            speakText(`Giấy chứng nhận tốt nghiệp xưởng đã được in! Cậu đạt ${sessionData.score} điểm.`);
+            saveTeacherData();
+        }
+
+        // --- TM & Storage ---
+        function logError(stg, type, det) { sessionData.errorsLogged.push({ stage: stg, errorType: type, detail: det, time: new Date().toISOString() }); }
+        function saveTeacherData() { localStorage.setItem(APP_ID + '_cur', JSON.stringify(sessionData)); }
+        function loadTeacherData() { if(!localStorage.getItem(APP_ID + '_hist')) localStorage.setItem(APP_ID + '_hist', JSON.stringify([])); }
+
+        function handleTeacherTrigger() {
+            clickCountForTeacher++; clearTimeout(teacherTimer); teacherTimer = setTimeout(()=>clickCountForTeacher=0, 2000);
+            if(clickCountForTeacher>=5) { clickCountForTeacher=0; playSFX('correct'); openTM(); }
+        }
+        function openTM() {
+            document.getElementById('teacher-modal').classList.remove('hidden');
+            const cur = JSON.parse(localStorage.getItem(APP_ID + '_cur') || JSON.stringify(sessionData));
+            document.getElementById('tm-avg').innerText = cur.score;
+            document.getElementById('tm-time').innerText = Math.floor(cur.timeSpent/60) + 'p';
+            document.getElementById('tm-err-unit').innerText = cur.errorsLogged.filter(e=>e.errorType==='wrong_target_unit' || e.errorType==='unit_conversion' || e.errorType==='comma_placement').length;
+            document.getElementById('tm-error-list').innerHTML = cur.errorsLogged.map(e=>`<li class="bg-red-50 p-2 rounded-xl border border-red-200 text-xs md:text-sm font-semibold text-red-700"><span class="bg-red-200 text-red-800 px-2 py-1 rounded text-[10px] mr-2 uppercase">${e.stage}</span> ${e.detail}</li>`).join('') || "<li class='text-center text-gray-400 font-bold'>Chưa có lỗi nào!</li>";
+        }
+        function closeTeacherMode() { document.getElementById('teacher-modal').classList.add('hidden'); playSFX('click');}
+        function switchTeacherTab(id) { 
+            playSFX('click');
+            ['stats','errors','objectives'].forEach(i=>document.getElementById('tab-'+i).classList.add('hidden')); 
+            document.getElementById('tab-'+id).classList.remove('hidden'); 
+            
+            const tabs = document.querySelectorAll('#teacher-modal .overflow-x-auto button');
+            tabs.forEach(t => { t.className = "px-4 py-2 md:py-3 font-bold text-gray-500 hover:text-amber-600 hover:bg-gray-50 rounded-t-lg transition-colors text-xs md:text-base"; });
+            event.currentTarget.className = "px-4 py-2 md:py-3 font-black text-amber-700 border-b-4 border-amber-500 bg-amber-50 rounded-t-lg transition-colors text-xs md:text-base";
+        }
+        
+        function exportData(type) {
+            playSFX('click');
+            const cur = JSON.parse(localStorage.getItem(APP_ID + '_cur') || JSON.stringify(sessionData));
+            let dataStr = "", mime = "";
+            if(type === 'json') {
+                dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cur, null, 2)); mime = "robo_phay_tram3_data.json";
+            } else if (type === 'csv') {
+                let csv = "Time,Stage,Error Type,Detail\n"; cur.errorsLogged.forEach(e => csv += `${e.time},${e.stage},${e.errorType},"${e.detail}"\n`);
+                dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csv); mime = "robo_phay_tram3_errors.csv";
+            }
+            const node = document.createElement('a'); node.setAttribute("href", dataStr); node.setAttribute("download", mime);
+            document.body.appendChild(node); node.click(); node.remove();
+        }
+        function resetData() { 
+            playSFX('click');
+            if(confirm("Cảnh báo: Xóa sạch sành sanh dữ liệu cày cuốc?")) { 
+                localStorage.removeItem(APP_ID + '_hist'); localStorage.removeItem(APP_ID + '_cur'); location.reload(); 
+            } 
+        }
+
+        function unlockAPI() {
+            const p = document.getElementById('api-password').value.trim();
+            const decodedString = atob(ENCRYPTED_PAYLOAD);
+            if(p === decodedString.split('|')[0]) { 
+                playSFX('correct'); 
+                gcpApiKey = decodedString.split('|')[1]; 
+                document.getElementById('auth-modal').classList.add('hidden'); 
+                initApp(); 
+            } else { 
+                playSFX('wrong'); 
+                document.getElementById('api-password').classList.add('shake-error'); 
+                safeSetTimeout(()=>document.getElementById('api-password').classList.remove('shake-error'), 500); 
+            }
+        }
+        function skipAuth() { playSFX('click'); document.getElementById('auth-modal').classList.add('hidden'); initApp(); }
+        document.getElementById('api-password').onkeypress = e => { if(e.key==='Enter') unlockAPI(); };
+        
+        if ('speechSynthesis' in window) { window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices(); }
+        document.addEventListener('touchmove', function(event) { if (event.scale !== 1) { event.preventDefault(); } }, { passive: false });
+    </script>
+</body>
+</html>

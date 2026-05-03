@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Thành Phố Số Thập Phân - Hành Trình Robo Phẩy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800;900&display=swap');
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: #0f172a; /* Slate 900 */
+            user-select: none;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Cityscape Background */
+        .city-bg {
+            background: linear-gradient(to bottom, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+        }
+        
+        .stars {
+            background-image: radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px);
+            background-size: 250px 250px;
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.3;
+            animation: twinkle 5s infinite linear;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+            100% { opacity: 0.3; }
+        }
+
+        @keyframes floating { 
+            0%, 100% { transform: translateY(0); } 
+            50% { transform: translateY(-10px); } 
+        }
+        .animate-float { animation: floating 3s ease-in-out infinite; }
+
+        @keyframes pulse-glow { 
+            0%, 100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.5); } 
+            50% { box-shadow: 0 0 30px rgba(56, 189, 248, 0.9); } 
+        }
+        .glow-effect { animation: pulse-glow 2s infinite; }
+
+        @keyframes shake { 
+            0%, 100% { transform: translateX(0); } 
+            25% { transform: translateX(-5px); } 
+            50% { transform: translateX(5px); } 
+            75% { transform: translateX(-5px); } 
+        }
+        .shake-error { animation: shake 0.5s; border-color: #ef4444 !important; background-color: #fef2f2 !important; color: #ef4444 !important;}
+
+        .card-station {
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+        }
+        .card-station:hover {
+            transform: scale(1.05) translateY(-5px);
+        }
+        .card-station:active {
+            transform: scale(0.95);
+        }
+
+        /* Iframe overlay transitions */
+        #game-overlay {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        #game-overlay.hidden-overlay {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="h-[100dvh] flex flex-col relative overflow-hidden">
+
+    <div class="city-bg"></div>
+    <div class="stars"></div>
+
+    <!-- 1. MÀN HÌNH ĐĂNG NHẬP (AUTH MODAL) -->
+    <div id="hub-auth-modal" class="fixed inset-0 bg-slate-900/90 z-[200] flex items-center justify-center backdrop-blur-md p-4 transition-opacity">
+        <div class="bg-white/10 backdrop-blur-lg w-full max-w-md rounded-3xl p-8 flex flex-col items-center text-center shadow-[0_0_50px_rgba(56,189,248,0.2)] border border-white/20">
+            <div class="w-24 h-24 bg-gradient-to-br from-sky-400 to-blue-600 rounded-full flex items-center justify-center text-5xl mb-6 shadow-lg animate-float border-4 border-white glow-effect">🤖</div>
+            <h2 class="text-2xl md:text-3xl font-black text-white mb-2 uppercase tracking-wider">Cổng Thành Phố</h2>
+            <p class="text-sky-200 font-bold mb-6 text-sm">Nhập mật mã để kích hoạt hệ thống vạn năng</p>
+            
+            <input type="password" id="api-password" class="w-full bg-slate-800/50 border-b-4 border-2 border-sky-500/50 rounded-2xl p-4 text-center text-2xl font-black text-white mb-6 focus:outline-none focus:border-sky-400 focus:bg-slate-800 transition-colors placeholder-slate-500" placeholder="Mật khẩu (admin)...">
+            
+            <div class="flex flex-col gap-3 w-full">
+                <button class="w-full bg-gradient-to-r from-sky-400 to-blue-600 hover:from-sky-500 hover:to-blue-700 text-white font-black py-4 rounded-2xl shadow-[0_6px_0_#1e3a8a] active:shadow-[0_0px_0_#1e3a8a] active:translate-y-1.5 transition-all text-lg border border-white/20" onclick="unlockHub()">
+                    Mở Cổng Không Gian <i class="fa-solid fa-key ml-2"></i>
+                </button>
+            </div>
+            
+            <div id="auth-error" class="text-red-400 font-bold mt-4 h-6 opacity-0 transition-opacity">Sai mật mã! Thử lại nhé.</div>
+        </div>
+    </div>
+
+    <!-- 2. MÀN HÌNH BẢN ĐỒ CHÍNH (MAP HUB) -->
+    <div id="hub-map" class="flex-1 flex flex-col items-center p-4 md:p-8 h-full overflow-y-auto opacity-0 pointer-events-none transition-opacity duration-500 absolute inset-0 z-10">
+        
+        <!-- Header -->
+        <header class="w-full max-w-5xl flex justify-between items-center mb-8 shrink-0 bg-white/10 backdrop-blur-md p-3 md:p-4 rounded-3xl border border-white/20 shadow-lg">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-br from-sky-400 to-blue-600 w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-2xl shadow-inner border-2 border-white/50">🤖</div>
+                <div>
+                    <h1 class="text-xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-blue-200 uppercase tracking-widest drop-shadow">Thành Phố Số</h1>
+                    <p class="text-sky-200 font-bold text-xs md:text-sm">Hệ thống vạn năng đã kích hoạt</p>
+                </div>
+            </div>
+            <button class="bg-red-500/80 hover:bg-red-600 text-white p-3 rounded-full shadow-md border border-red-400 transition-colors" onclick="lockHub()" title="Đăng xuất">
+                <i class="fa-solid fa-power-off text-lg md:text-xl"></i>
+            </button>
+        </header>
+
+        <!-- Grid 4 Trạm -->
+        <div class="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8 flex-1 content-center">
+            
+            <!-- Trạm 1 -->
+            <div class="card-station bg-gradient-to-br from-blue-400 to-blue-600 rounded-[2rem] p-6 shadow-xl border-4 border-white/20 relative overflow-hidden" onclick="openGame(1, 'Trạm 1: Xây Nhà Chữ Số')">
+                <div class="absolute -right-4 -bottom-4 text-8xl opacity-20 transform -rotate-12 pointer-events-none"><i class="fa-solid fa-city"></i></div>
+                <div class="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-4 backdrop-blur-sm border border-white/30 text-white"><i class="fa-solid fa-trowel-bricks"></i></div>
+                <h2 class="text-2xl md:text-3xl font-black text-white mb-2 drop-shadow-md">Trạm 1</h2>
+                <p class="text-blue-100 font-bold text-lg md:text-xl drop-shadow-sm">Xây Nhà Chữ Số</p>
+                <div class="mt-4 inline-block bg-white/20 px-4 py-1 rounded-full text-white font-bold text-sm backdrop-blur-sm border border-white/20">Cấu tạo số thập phân</div>
+            </div>
+
+            <!-- Trạm 2 -->
+            <div class="card-station bg-gradient-to-br from-cyan-400 to-teal-500 rounded-[2rem] p-6 shadow-xl border-4 border-white/20 relative overflow-hidden" onclick="openGame(2, 'Trạm 2: Vượt Cầu So Sánh')">
+                <div class="absolute -right-4 -bottom-4 text-8xl opacity-20 transform -rotate-12 pointer-events-none"><i class="fa-solid fa-bridge-water"></i></div>
+                <div class="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-4 backdrop-blur-sm border border-white/30 text-white"><i class="fa-solid fa-scale-unbalanced"></i></div>
+                <h2 class="text-2xl md:text-3xl font-black text-white mb-2 drop-shadow-md">Trạm 2</h2>
+                <p class="text-cyan-50 font-bold text-lg md:text-xl drop-shadow-sm">Vượt Cầu So Sánh</p>
+                <div class="mt-4 inline-block bg-white/20 px-4 py-1 rounded-full text-white font-bold text-sm backdrop-blur-sm border border-white/20">So sánh & Sắp xếp</div>
+            </div>
+
+            <!-- Trạm 3 -->
+            <div class="card-station bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2rem] p-6 shadow-xl border-4 border-white/20 relative overflow-hidden" onclick="openGame(3, 'Trạm 3: Xưởng Đo Lường')">
+                <div class="absolute -right-4 -bottom-4 text-8xl opacity-20 transform -rotate-12 pointer-events-none"><i class="fa-solid fa-conveyor-belt"></i></div>
+                <div class="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-4 backdrop-blur-sm border border-white/30 text-white"><i class="fa-solid fa-ruler-combined"></i></div>
+                <h2 class="text-2xl md:text-3xl font-black text-white mb-2 drop-shadow-md">Trạm 3</h2>
+                <p class="text-orange-50 font-bold text-lg md:text-xl drop-shadow-sm">Xưởng Đo Lường</p>
+                <div class="mt-4 inline-block bg-white/20 px-4 py-1 rounded-full text-white font-bold text-sm backdrop-blur-sm border border-white/20">Đổi đơn vị đo lường</div>
+            </div>
+
+            <!-- Trạm 4 -->
+            <div class="card-station bg-gradient-to-br from-purple-500 to-indigo-600 rounded-[2rem] p-6 shadow-xl border-4 border-white/20 relative overflow-hidden" onclick="openGame(4, 'Trạm 4: Đấu Trường Cuối')">
+                <div class="absolute -right-4 -bottom-4 text-8xl opacity-20 transform -rotate-12 pointer-events-none"><i class="fa-solid fa-trophy"></i></div>
+                <div class="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-4 backdrop-blur-sm border border-white/30 text-white"><i class="fa-solid fa-dragon"></i></div>
+                <h2 class="text-2xl md:text-3xl font-black text-white mb-2 drop-shadow-md">Trạm 4</h2>
+                <p class="text-purple-100 font-bold text-lg md:text-xl drop-shadow-sm">Đấu Trường Cuối</p>
+                <div class="mt-4 inline-block bg-white/20 px-4 py-1 rounded-full text-white font-bold text-sm backdrop-blur-sm border border-white/20">Tổng ôn & Làm tròn số</div>
+            </div>
+
+        </div>
+        
+        <div class="mt-8 text-sky-300/50 text-sm font-bold tracking-widest uppercase pb-4">Hệ thống quản lý giáo dục 5.0</div>
+    </div>
+
+    <!-- 3. MÀN HÌNH CHƠI GAME (IFRAME OVERLAY) -->
+    <div id="game-overlay" class="fixed inset-0 bg-black z-[300] hidden-overlay flex flex-col">
+        <!-- Top bar riêng của Iframe để dễ dàng thoát -->
+        <div class="h-12 bg-slate-900 flex justify-between items-center px-4 shrink-0 border-b border-slate-700">
+            <div class="text-white font-bold truncate flex-1" id="playing-title">Đang tải...</div>
+            <button class="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors shrink-0" onclick="closeGame()">
+                <i class="fa-solid fa-right-from-bracket"></i> Đóng & Quay Lại
+            </button>
+        </div>
+        <!-- Vùng chứa game -->
+        <iframe id="game-frame" class="w-full flex-1 bg-white border-none" sandbox="allow-scripts allow-same-origin allow-downloads allow-popups"></iframe>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- KHU VỰC HÀNG CHỜ: DÁN TOÀN BỘ SOURCE CODE CỦA 4 FILE HTML CŨ VÀO ĐÂY -->
+    <!-- (Đã được nâng cấp sử dụng thẻ textarea để chống lỗi Parsing) -->
+    <!-- ========================================================================= -->
+
+    <!-- CODE TRẠM 1 -->
+    <textarea id="code-tram-1" style="display:none;">
+        <!-- Xóa dòng này và dán toàn bộ code (từ <!DOCTYPE html> đến </html>) của file "tram 1.html" vào đây -->
+    </textarea>
+
+    <!-- CODE TRẠM 2 -->
+    <textarea id="code-tram-2" style="display:none;">
+        <!-- Xóa dòng này và dán toàn bộ code (từ <!DOCTYPE html> đến </html>) của file "tram 2.html" vào đây -->
+    </textarea>
+
+    <!-- CODE TRẠM 3 -->
+    <textarea id="code-tram-3" style="display:none;">
+        <!-- Xóa dòng này và dán toàn bộ code (từ <!DOCTYPE html> đến </html>) của file "tram 3.html" vào đây -->
+    </textarea>
+
+    <!-- CODE TRẠM 4 -->
+    <textarea id="code-tram-4" style="display:none;">
+        <!-- Xóa dòng này và dán toàn bộ code (từ <!DOCTYPE html> đến </html>) của file "tram 4.html" vào đây -->
+    </textarea>
+
+    <!-- ========================================================================= -->
+    <!-- THUẬT TOÁN ĐIỀU KHIỂN & BƠM API -->
+    <!-- ========================================================================= -->
+    <script>
+        // Cấu hình bảo mật theo yêu cầu
+        const ENCRYPTED_PAYLOAD = "YWRtaW58QUl6YVN5Q0hrZElrYy10WklZUGx5emdQTFZ3bXZSSk91T2toeWVF";
+        let extractedApiKey = null;
+
+        // UI Elements
+        const authModal = document.getElementById('hub-auth-modal');
+        const mapHub = document.getElementById('hub-map');
+        const pwdInput = document.getElementById('api-password');
+        const errText = document.getElementById('auth-error');
+        const gameOverlay = document.getElementById('game-overlay');
+        const gameFrame = document.getElementById('game-frame');
+        const titleEl = document.getElementById('playing-title');
+
+        // Bắt sự kiện phím Enter ở ô mật khẩu
+        pwdInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') unlockHub();
+        });
+
+        // 1. Thuật toán Mở Khóa & Trích xuất API Key
+        function unlockHub() {
+            const inputPass = pwdInput.value.trim();
+            if (!inputPass) return;
+            
+            try {
+                // Giải mã Base64
+                const decoded = atob(ENCRYPTED_PAYLOAD);
+                const parts = decoded.split('|');
+                
+                // Kiểm tra mật khẩu
+                if (inputPass === parts[0]) { 
+                    extractedApiKey = parts[1];
+                    
+                    // Ẩn Auth, Hiện Map với hiệu ứng
+                    authModal.style.opacity = '0';
+                    setTimeout(() => {
+                        authModal.style.display = 'none';
+                        mapHub.classList.remove('opacity-0', 'pointer-events-none');
+                    }, 300);
+                    
+                } else {
+                    // Sai mật khẩu
+                    pwdInput.classList.add('shake-error');
+                    errText.style.opacity = '1';
+                    setTimeout(() => {
+                        pwdInput.classList.remove('shake-error');
+                        errText.style.opacity = '0';
+                    }, 1000);
+                }
+            } catch (e) {
+                console.error("Lỗi giải mã hệ thống", e);
+                alert("Hệ thống giải mã gặp sự cố!");
+            }
+        }
+
+        function lockHub() {
+            if(confirm("Bạn muốn khóa hệ thống và thoát?")) {
+                extractedApiKey = null;
+                pwdInput.value = '';
+                mapHub.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => {
+                    authModal.style.display = 'flex';
+                    // Trigger reflow
+                    void authModal.offsetWidth;
+                    authModal.style.opacity = '1';
+                }, 500);
+            }
+        }
+
+        // 2. Thuật toán Nạp Code và Bơm API Key (Injection) vào Iframe
+        function openGame(tramId, title) {
+            // Lấy mã nguồn nguyên bản từ vùng chờ
+            const codeScript = document.getElementById('code-tram-' + tramId);
+            let rawCode = codeScript ? codeScript.value.trim() : "";
+            
+            // Kiểm tra xem người dùng đã dán code chưa (nếu chuỗi rỗng hoặc còn chứa text giữ chỗ)
+            if (!rawCode || rawCode.includes('<!-- Xóa dòng này')) {
+                alert("LỖI HỆ THỐNG:\nBạn chưa dán source code của file Trạm " + tramId + ".html vào vị trí hàng chờ id=\"code-tram-" + tramId + "\" trong file này.\nVui lòng mở mã nguồn và dán code vào để chơi.");
+                return;
+            }
+
+            titleEl.innerText = title;
+
+            // Xây dựng kịch bản Bơm API & Cắt cửa sổ Auth của game con bằng mảng chuỗi an toàn tuyệt đối
+            const bypassInjectionCode = [
+                "<style>",
+                "    #auth-modal { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }",
+                "    body { overflow: hidden !important; } /* Tránh scrollbar kép */",
+                "</style>",
+                "<scr" + "ipt>",
+                "    window.addEventListener('DOMContentLoaded', function() {",
+                "        window.gcpApiKey = '" + extractedApiKey + "';",
+                "        const modal = document.getElementById('auth-modal');",
+                "        if(modal) modal.remove();",
+                "    });",
+                "    window.addEventListener('load', function() {",
+                "        window.gcpApiKey = '" + extractedApiKey + "';",
+                "        if(typeof window.initApp === 'function') {",
+                "            window.initApp();",
+                "        }",
+                "    });",
+                "</scr" + "ipt>"
+            ].join("\n");
+
+            // Chèn mã Bơm vào cuối thẻ <head> của rawCode
+            let injectedCode = rawCode;
+            if (rawCode.includes('</head>')) {
+                injectedCode = rawCode.replace('</head>', bypassInjectionCode + '\n</head>');
+            } else {
+                injectedCode += bypassInjectionCode;
+            }
+
+            // Mở Iframe Overlay
+            gameOverlay.classList.remove('hidden-overlay');
+            
+            // Ghi mã đã bơm vào iframe
+            gameFrame.srcdoc = injectedCode;
+        }
+
+        // 3. Đóng Game và trở về màn hình Hub
+        function closeGame() {
+            // Hiển thị cảnh báo để tránh việc học sinh ấn nhầm
+            if(confirm("Dữ liệu trạm đang chơi sẽ được lưu lại (nếu có). Bạn chắc chắn muốn quay lại Thành phố?")) {
+                gameOverlay.classList.add('hidden-overlay');
+                // Xóa srcdoc để giải phóng bộ nhớ và âm thanh đang phát của game con
+                setTimeout(() => {
+                    gameFrame.srcdoc = "";
+                }, 400);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trạm 2: Vượt Cầu So Sánh - Phiêu lưu cùng Robo Phẩy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800;900&display=swap');
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: #ecfeff;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Animations */
+        @keyframes floating { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-10px) rotate(1deg); } }
+        .animate-float { animation: floating 4s ease-in-out infinite; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-5px); } }
+        .shake-error { animation: shake 0.5s; border-color: #ef4444 !important; background-color: #fef2f2 !important; color: #ef4444 !important;}
+        @keyframes pop { 0% { transform: scale(0.9); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .animate-pop { animation: pop 0.3s ease-out; }
+        
+        /* Drag & Drop */
+        .drag-card { cursor: grab; transition: transform 0.1s; }
+        .drag-card:active { cursor: grabbing; transform: scale(1.1); }
+        .drop-zone { transition: all 0.3s; }
+        .drop-zone.drag-over { background-color: #fef08a; border-color: #eab308; transform: scale(1.05); }
+
+        /* UI */
+        .btn-primary { @apply bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-500 hover:to-blue-600 text-white font-black py-3 px-6 rounded-2xl shadow-[0_6px_0_#0284c7] active:shadow-[0_0px_0_#0284c7] active:translate-y-1.5 transition-all text-lg tracking-wide border-2 border-white/20; }
+        .btn-secondary { @apply bg-white border-2 border-cyan-500 text-cyan-600 font-black py-3 px-6 rounded-2xl shadow-[0_4px_0_#06b6d4] hover:bg-cyan-50 active:shadow-[0_0px_0_#06b6d4] active:translate-y-1 transition-all text-lg; }
+        
+        .bridge-bg {
+            background-image: repeating-linear-gradient(90deg, transparent, transparent 40px, #94a3b8 40px, #94a3b8 45px);
+            border-top: 8px solid #475569;
+            border-bottom: 4px solid #334155;
+        }
+        .speech-bubble { position: relative; background: white; border-radius: .4em; }
+        .speech-bubble:after {
+            content: ''; position: absolute; bottom: 0; left: 20%; width: 0; height: 0;
+            border: 20px solid transparent; border-top-color: white; border-bottom: 0; border-left: 0;
+            margin-left: -10px; margin-bottom: -20px;
+        }
+
+        /* Card flip logic for match game */
+        .match-card { transition: all 0.2s; cursor: pointer; }
+        .match-card.matched { opacity: 0.7; pointer-events: none; border-color: #22c55e; background-color: #dcfce7; color: #15803d; }
+        .match-card.selected { border-color: #06b6d4; background-color: #cffafe; transform: scale(1.05); box-shadow: 0 0 15px rgba(6, 182, 212, 0.4); }
+    </style>
+</head>
+<body class="h-screen flex flex-col items-center justify-center relative">
+
+    <!-- Header -->
+    <div class="fixed top-0 w-full max-w-4xl p-4 flex justify-between items-center z-50">
+        <div class="flex items-center gap-2 cursor-pointer" id="teacher-trigger" onclick="handleTeacherTrigger()">
+            <div class="bg-white p-2 rounded-full shadow-md border-2 border-cyan-100"><i class="fa-solid fa-bridge-water text-cyan-500 text-xl"></i></div>
+            <span class="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-700 to-blue-700 tracking-wider text-lg drop-shadow-sm uppercase">Cầu So Sánh</span>
+        </div>
+        <div class="flex gap-2 md:gap-3">
+            <button class="bg-white p-2 md:p-3 rounded-full shadow-md text-gray-600 hover:text-indigo-500 hover:scale-110 transition-transform" onclick="goToHome()" title="Trở về trang chủ">
+                <i class="fa-solid fa-house text-lg md:text-xl"></i>
+            </button>
+            <button class="bg-white p-2 md:p-3 rounded-full shadow-md text-gray-600 hover:text-orange-500 hover:scale-110 transition-transform" onclick="skipScreen()" title="Bỏ qua">
+                <i class="fa-solid fa-forward-step text-lg md:text-xl"></i>
+            </button>
+            <button class="bg-white p-2 md:p-3 rounded-full shadow-md text-gray-600 hover:text-cyan-500 hover:scale-110 transition-transform" onclick="toggleGlobalAudio()" title="Bật/Tắt âm thanh">
+                <i id="audio-icon" class="fa-solid fa-volume-high text-lg md:text-xl"></i>
+            </button>
+            <button class="bg-white p-2 md:p-3 rounded-full shadow-md text-gray-600 hover:text-green-500 hover:scale-110 transition-transform animate-pulse" onclick="playCurrentHint()" title="Nghe lại gợi ý">
+                <i class="fa-solid fa-circle-info text-lg md:text-xl"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div id="app-container" class="w-full max-w-4xl h-[90vh] mt-10 bg-white rounded-3xl shadow-2xl overflow-y-auto overflow-x-hidden relative flex flex-col border-4 border-cyan-50">
+        <!-- JS Injects Here -->
+    </div>
+
+    <!-- Teacher Modal -->
+    <div id="teacher-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center">
+        <div class="bg-white w-11/12 max-w-3xl h-[80vh] rounded-2xl p-6 flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-chalkboard-user mr-2"></i>Chế độ Giáo Viên - Trạm 2</h2>
+                <button onclick="closeTeacherMode()" class="text-gray-500 hover:text-red-500 text-2xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+            
+            <div class="flex border-b mb-4">
+                <button class="px-4 py-2 font-bold text-cyan-600 border-b-2 border-cyan-600" onclick="switchTeacherTab('stats')">Thống kê</button>
+                <button class="px-4 py-2 font-bold text-gray-500 hover:text-cyan-600" onclick="switchTeacherTab('errors')">Lỗi phổ biến</button>
+                <button class="px-4 py-2 font-bold text-gray-500 hover:text-cyan-600" onclick="switchTeacherTab('objectives')">Mục tiêu</button>
+            </div>
+
+            <div id="tab-stats" class="flex-1 overflow-y-auto">
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-cyan-50 p-4 rounded-xl border border-cyan-200 text-center">
+                        <p class="text-sm text-cyan-600 font-bold">Điểm trung bình</p>
+                        <p class="text-3xl font-black text-cyan-800" id="tm-avg">0</p>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-xl border border-orange-200 text-center">
+                        <p class="text-sm text-orange-600 font-bold">Lỗi phần thập phân</p>
+                        <p class="text-3xl font-black text-orange-800" id="tm-err-dec">0</p>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-xl border border-purple-200 text-center">
+                        <p class="text-sm text-purple-600 font-bold">Lỗi bẫy độ dài</p>
+                        <p class="text-3xl font-black text-purple-800" id="tm-err-len">0</p>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded" onclick="exportData('json')">Xuất JSON</button>
+                    <button class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded" onclick="exportData('csv')">Xuất CSV</button>
+                    <button class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded ml-auto" onclick="resetData()">Xóa Dữ Liệu</button>
+                </div>
+            </div>
+
+            <div id="tab-errors" class="flex-1 overflow-y-auto hidden">
+                <ul class="space-y-3" id="tm-error-list"></ul>
+            </div>
+             <div id="tab-objectives" class="flex-1 overflow-y-auto hidden">
+                <h3 class="font-bold mb-2">Mục tiêu Trạm 2:</h3>
+                <ul class="list-disc pl-5 text-gray-700">
+                    <li>So sánh được các số thập phân theo quy tắc (phần nguyên -> phần mười -> phần trăm).</li>
+                    <li>Tìm số trong khoảng, sắp xếp dãy số.</li>
+                    <li>Vượt qua "bẫy độ dài" và hiểu quy tắc số 0 tận cùng (VD: 0,7 = 0,70).</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-80 z-[200] flex items-center justify-center">
+        <div class="bg-white w-11/12 max-w-md rounded-3xl p-8 flex flex-col items-center text-center shadow-2xl border-4 border-cyan-400">
+            <div class="text-6xl mb-4">🤖</div>
+            <h2 class="text-2xl font-black text-cyan-800 mb-6">Mật mã Trạm 2</h2>
+            <input type="password" id="api-password" class="w-full border-4 border-cyan-200 rounded-2xl p-4 text-center text-2xl font-bold mb-4 focus:outline-none" placeholder="Mật khẩu...">
+            <div class="flex gap-4 w-full">
+                <button class="flex-1 bg-gray-200 hover:bg-gray-300 font-bold py-3 rounded-2xl" onclick="skipAuth()">Bỏ qua</button>
+                <button class="flex-1 btn-primary py-3 rounded-2xl" onclick="unlockAPI()">Kích hoạt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Logic -->
+    <script>
+        const APP_ID = 'robo_phay_tram2_v3';
+        let isAudioEnabled = true;
+        let currentScreenIndex = 0;
+        let currentStageErrors = 0;
+        let clickCountForTeacher = 0, teacherTimer = null;
+        let currentHintText = "";
+        let gcpApiKey = null, currentAudio = null;
+        let ttsAbortController = null;
+        const ENCRYPTED_PAYLOAD = "YWRtaW58QUl6YVN5Q0hrZElrYy10WklZUGx5emdQTFZ3bXZSSk91T2toeWVF";
+
+        let sessionData = { score: 0, correctAnswers: 0, wrongAnswers: 0, errorsLogged: [], badges: [] };
+
+        // Dữ liệu kịch bản chuẩn xác theo yêu cầu
+        const SCREENS = [
+            { id: 'intro', type: 'intro' },
+            { id: 'rule', type: 'rule' }, // Mô phỏng 135,74 và 135,75 (3 bước)
+            
+            // Kéo dấu
+            { id: 'mode1_1', type: 'drag', data: { p: [{a: "37,29", b: "36,92", ans: ">"}, {a: "89,215", b: "89,215", ans: "="}] } },
+            { id: 'mode1_2', type: 'drag', data: { p: [{a: "0,8", b: "0,79", ans: ">"}, {a: "15,02", b: "15,20", ans: "<"}] } },
+            
+            // Tìm số trong khoảng (MỚI)
+            { id: 'mode_range', type: 'range', data: { min: "3,5", max: "3,8", opts: ["3,49", "3,65", "3,81"], ans: 1, q: "Robo cần sạc pin ở trạm nằm giữa km 3,5 và km 3,8." } },
+            
+            // Chọn cầu
+            { id: 'mode2_1', type: 'bridge', data: { b: [{v: 2.29, t: "2,29 km"}, {v: 3.5, t: "3,5 km"}, {v: 2.75, t: "2,75 km"}], q: "Mật lệnh: Chọn cây cầu NGẮN NHẤT để đi nhanh hơn!", ans: 0 } },
+            
+            // Sắp xếp
+            { id: 'mode3', type: 'sort', data: { nums: ["3,604", "2,875", "2,857", "3,106"], correct: ["2,857", "2,875", "3,106", "3,604"], type: "Hiệu lệnh: TỪ BÉ ĐẾN LỚN" } },
+            
+            // Ghép cặp số bằng nhau (MỚI - Thêm bớt 0)
+            { id: 'mode4', type: 'match', data: { pairs: [["0,7", "0,70"], ["5,12", "5,120"], ["135", "135,0"]] } },
+            
+            // Boss tốc độ
+            { id: 'mode5', type: 'speed', data: { a: "12,3", b: "12,29", ans: ">" } },
+            { id: 'summary', type: 'summary' }
+        ];
+
+        // --- Audio Logic ---
+        function stopAllAudio() {
+            if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
+            if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); }
+            if (ttsAbortController) { ttsAbortController.abort(); }
+        }
+
+        async function speakText(text) {
+            currentHintText = text;
+            if (!isAudioEnabled) return;
+            
+            stopAllAudio(); // Dừng mọi âm thanh đang phát để tránh chồng chéo
+
+            // Strip emojis for better TTS reading, and format numbers
+            let pText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+            pText = pText.replace(/(\d),(\d)/g, '$1 phẩy $2').replace(/>/g, 'lớn hơn').replace(/</g, 'bé hơn').replace(/=/g, 'bằng').replace(/\bkm\b/gi, 'ki lô mét');
+            
+            if (gcpApiKey) {
+                try {
+                    ttsAbortController = new AbortController();
+                    const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${gcpApiKey}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        signal: ttsAbortController.signal,
+                        body: JSON.stringify({ input: { text: pText }, voice: { languageCode: 'vi-VN', name: 'vi-VN-Neural2-A' }, audioConfig: { audioEncoding: 'MP3', speakingRate: 0.9, pitch: 3.0 } })
+                    });
+                    if (res.ok) { 
+                        const d = await res.json(); 
+                        if (!ttsAbortController.signal.aborted) {
+                            currentAudio = new Audio("data:audio/mp3;base64," + d.audioContent); 
+                            currentAudio.play().catch(e => console.log("Audio prevented:", e)); 
+                        }
+                        return; 
+                    }
+                } catch (e) { 
+                    if (e.name === 'AbortError') return; 
+                }
+            }
+            if ('speechSynthesis' in window) {
+                const msg = new SpeechSynthesisUtterance(pText); msg.lang = 'vi-VN'; msg.rate = 0.9; msg.pitch = 1.1;
+                window.speechSynthesis.speak(msg);
+            }
+        }
+        function toggleGlobalAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            document.getElementById('audio-icon').className = isAudioEnabled ? 'fa-solid fa-volume-high text-lg md:text-xl' : 'fa-solid fa-volume-xmark text-lg md:text-xl text-red-500';
+            if(!isAudioEnabled) stopAllAudio(); else speakText("Đã bật hệ thống liên lạc!");
+        }
+        function playCurrentHint() { if(currentHintText) speakText(currentHintText); }
+        function playSFX(type) {
+            if (!isAudioEnabled) return;
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator(), gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            if (type === 'correct') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(523.25, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(); osc.stop(ctx.currentTime + 0.5);
+            } else {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start(); osc.stop(ctx.currentTime + 0.3);
+            }
+        }
+
+        // --- Core Flow ---
+        function initApp() { loadTeacherData(); renderScreen(); }
+        function nextScreen() { stopAllAudio(); currentStageErrors = 0; if (currentScreenIndex < SCREENS.length - 1) { currentScreenIndex++; renderScreen(); } }
+        function prevScreen() { stopAllAudio(); if (currentScreenIndex > 0) { currentScreenIndex--; currentStageErrors = 0; renderScreen(); } }
+        function showNextBtn(hideId) { if(hideId) document.getElementById(hideId).classList.add('hidden'); document.getElementById('btn-next').classList.remove('hidden'); document.getElementById('btn-next').classList.add('animate-pop'); }
+
+        function skipScreen() {
+            stopAllAudio();
+            if (currentScreenIndex < SCREENS.length - 1) {
+                currentScreenIndex++;
+                currentStageErrors = 0;
+                renderScreen();
+            }
+        }
+
+        function goToHome() {
+            if (confirm("Bạn có chắc chắn muốn thoát nhiệm vụ? Radar sẽ bị khởi động lại từ đầu!")) {
+                stopAllAudio();
+                currentScreenIndex = 0;
+                currentStageErrors = 0;
+                sessionData = { score: 0, correctAnswers: 0, wrongAnswers: 0, errorsLogged: [], badges: [] };
+                renderScreen();
+            }
+        }
+
+        function renderScreen() {
+            const container = document.getElementById('app-container');
+            const data = SCREENS[currentScreenIndex];
+            container.innerHTML = '';
+            if(data.type === 'intro') renderIntro(container);
+            else if(data.type === 'rule') renderRule(container);
+            else if(data.type === 'drag') renderDrag(container, data.data);
+            else if(data.type === 'range') renderRange(container, data.data);
+            else if(data.type === 'bridge') renderBridge(container, data.data);
+            else if(data.type === 'sort') renderSort(container, data.data);
+            else if(data.type === 'match') renderMatch(container, data.data);
+            else if(data.type === 'speed') renderSpeed(container, data.data);
+            else if(data.type === 'summary') renderSummary(container);
+        }
+
+        // --- Screens ---
+        function renderIntro(c) {
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col items-center justify-center p-4 md:p-8 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9IiNjZmZhZmUiLz48L3N2Zz4=')]">
+                    <div class="w-full flex justify-center mb-4 relative h-32">
+                        <div class="absolute bottom-0 w-3/4 h-16 bg-blue-300 rounded-t-full opacity-50 blur-md"></div>
+                        <div class="z-10 text-6xl md:text-8xl animate-float mt-2 drop-shadow-lg">🤖</div>
+                    </div>
+                    <div class="speech-bubble p-5 md:p-8 mb-8 text-center max-w-lg shadow-xl border-4 border-cyan-300 mx-4 bg-white/95">
+                        <h1 class="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-blue-600 mb-3 uppercase tracking-wider">Trạm 2: Vượt Cầu!</h1>
+                        <p class="text-base md:text-lg text-gray-700 font-bold leading-relaxed">Nhiệm vụ: Dùng siêu năng lực <span class="text-orange-500 font-black">So Sánh Số Thập Phân</span> để tìm cây cầu an toàn nhất. Sẵn sàng khởi hành chưa đồng đội? 🚀</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row flex-wrap justify-center gap-4 w-full px-4 sm:w-auto">
+                        <button class="btn-secondary w-full sm:w-auto text-sm md:text-lg py-3 px-6" onclick="speakText('Chào đồng đội! Tớ là Robo Phẩy. Bật radar lên, dóng thẳng hàng các con số và giúp tớ tìm cây cầu an toàn nhất nhé!');"><i class="fa-solid fa-satellite-dish mr-2"></i> Nghe mật lệnh</button>
+                        <button class="btn-primary w-full sm:w-auto py-3 px-8 text-sm md:text-lg" onclick="nextScreen()">Xuất phát! <i class="fa-solid fa-rocket ml-2"></i></button>
+                    </div>
+                </div>`;
+        }
+
+        function renderRule(c) {
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-4 md:p-8 min-h-max bg-gradient-to-b from-slate-50 to-white">
+                    <h2 class="text-xl md:text-3xl font-black text-slate-700 mb-4 md:mb-6 text-center uppercase tracking-wide"><i class="fa-solid fa-microchip text-cyan-500 mr-2"></i> Cỗ Máy Quét So Sánh</h2>
+                    <p class="text-center text-gray-600 font-bold mb-4">Cùng xem máy quét hoạt động với 2 số: 135,74 và 135,75 nhé!</p>
+                    <div class="bg-slate-100 rounded-3xl p-4 md:p-6 border-4 border-slate-200 flex-1 flex flex-col items-center justify-center shadow-inner">
+                        <div class="bg-white p-4 md:p-8 rounded-2xl shadow-md border-2 border-cyan-100 flex flex-col gap-4 text-4xl md:text-6xl font-mono relative w-full max-w-[22rem] items-center">
+                            <div class="flex text-gray-800 z-10 tracking-[0.1em] md:tracking-[0.2em] font-black"><span id="w1" class="px-1 rounded transition-all duration-300">135</span><span class="text-red-500">,</span><span id="d11" class="px-1 rounded transition-all duration-300">7</span><span id="d12" class="px-1 rounded transition-all duration-300">4</span></div>
+                            <div class="w-full h-1 bg-gray-200 rounded-full my-1"></div>
+                            <div class="flex text-gray-800 z-10 tracking-[0.1em] md:tracking-[0.2em] font-black"><span id="w2" class="px-1 rounded transition-all duration-300">135</span><span class="text-red-500">,</span><span id="d21" class="px-1 rounded transition-all duration-300">7</span><span id="d22" class="px-1 rounded transition-all duration-300">5</span></div>
+                        </div>
+                        <div id="rule-fb" class="mt-6 md:mt-8 p-4 min-h-[4rem] text-base md:text-xl font-bold text-center w-full max-w-lg rounded-2xl flex items-center justify-center text-slate-500 bg-white shadow-sm border-2 border-dashed border-slate-300 animate-pulse">Bấm "Quét phần nguyên" để khởi động! 🔍</div>
+                        <div class="flex flex-wrap justify-center gap-2 md:gap-4 mt-6 md:mt-8 w-full">
+                            <button id="b1" class="btn-step bg-cyan-100 text-cyan-700 border-cyan-400 font-black py-2 px-3 md:px-5 rounded-xl border-b-4 hover:bg-cyan-200 hover:-translate-y-1 transition-all text-sm md:text-base" onclick="rStep(1)">1. Quét phần nguyên</button>
+                            <button id="b2" class="btn-step bg-gray-200 text-gray-400 border-gray-300 font-black py-2 px-3 md:px-5 rounded-xl border-b-4 cursor-not-allowed text-sm md:text-base opacity-70" disabled onclick="rStep(2)">2. Quét phần mười</button>
+                            <button id="b3" class="btn-step bg-gray-200 text-gray-400 border-gray-300 font-black py-2 px-3 md:px-5 rounded-xl border-b-4 cursor-not-allowed text-sm md:text-base opacity-70" disabled onclick="rStep(3)">3. Quét phần trăm</button>
+                        </div>
+                    </div>
+                    <div class="mt-4 md:mt-6 flex justify-end">
+                        <button id="btn-next" class="btn-primary text-sm md:text-lg opacity-50 pointer-events-none" onclick="nextScreen()">Tớ hiểu rồi, Chiến thôi! <i class="fa-solid fa-bolt text-yellow-300 ml-1"></i></button>
+                    </div>
+                </div>`;
+            setTimeout(() => speakText('Cùng xem cỗ máy quét hoạt động nhé. Bấm nút từ trái sang phải nào!'), 500);
+        }
+
+        function rStep(s) {
+            playSFX('correct');
+            const fb = document.getElementById('rule-fb'); 
+            fb.classList.remove('animate-pulse', 'border-slate-300', 'text-slate-500');
+            fb.classList.add('bg-cyan-50', 'text-cyan-700', 'border-cyan-400', 'border-solid');
+            
+            // Xóa toàn bộ highlight cũ
+            ['w1','w2','d11','d21','d12','d22'].forEach(id => {
+                let el = document.getElementById(id);
+                el.classList.remove('bg-yellow-300', 'text-white', 'scale-110', 'shadow-md');
+                el.classList.remove('bg-orange-400', 'bg-purple-500');
+            });
+            
+            if(s===1) {
+                ['w1','w2'].forEach(id => document.getElementById(id).classList.add('bg-yellow-300', 'scale-110', 'shadow-md', 'text-yellow-900'));
+                let msg = "Phần nguyên hòa nhau: 135 = 135! Hồi hộp quá, quét tiếp hàng phần mười thôi!";
+                fb.innerHTML = `🛡️ ${msg}`; speakText(msg);
+                enableBtn('b2'); disableBtn('b1');
+            } else if(s===2) {
+                ['d11','d21'].forEach(id => document.getElementById(id).classList.add('bg-orange-400', 'text-white', 'scale-110', 'shadow-md'));
+                let msg = "Hàng phần mười cũng là 7! Căng thẳng thật, phải dùng tuyệt chiêu soi hàng phần trăm!";
+                fb.innerHTML = `🔥 ${msg}`; speakText(msg);
+                enableBtn('b3'); disableBtn('b2');
+            } else if(s===3) {
+                ['d12','d22'].forEach(id => document.getElementById(id).classList.add('bg-purple-500', 'text-white', 'scale-110', 'shadow-md'));
+                let msg = "Bíp bíp! 4 bé hơn 5. Sự thật đã phơi bày: 135,74 bé hơn 135,75! Dễ như ăn kẹo!";
+                fb.innerHTML = `🎉 Hàng phần trăm: <span class='mx-2 text-2xl font-black text-purple-600'>4 < 5</span><br>=> 135,74 < 135,75`;
+                speakText(msg);
+                disableBtn('b3'); document.getElementById('btn-next').classList.remove('opacity-50', 'pointer-events-none');
+                document.getElementById('btn-next').classList.add('animate-pop');
+            }
+        }
+        function enableBtn(id) { let b = document.getElementById(id); b.disabled=false; b.className="btn-step bg-cyan-100 text-cyan-700 border-cyan-400 font-black py-2 px-3 md:px-5 rounded-xl border-b-4 hover:bg-cyan-200 hover:-translate-y-1 transition-all cursor-pointer text-sm md:text-base opacity-100"; }
+        function disableBtn(id) { let b = document.getElementById(id); b.disabled=true; b.className="btn-step bg-gray-200 text-gray-400 border-gray-300 font-black py-2 px-3 md:px-5 rounded-xl border-b-4 cursor-not-allowed text-sm md:text-base opacity-70 transition-all"; }
+
+        function renderDrag(c, d) {
+            const pairs = d.p.map((p, i) => `
+                <div class="flex items-center justify-center gap-3 md:gap-6 mb-4 md:mb-6 bg-white p-4 md:p-6 rounded-2xl border-4 border-indigo-50 shadow-md flex-wrap w-full max-w-md transition-transform hover:scale-[1.02]">
+                    <div class="text-2xl md:text-4xl font-black w-20 md:w-32 text-right shrink-0 text-slate-700">${p.a}</div>
+                    <div class="drop-zone sign-zone w-12 h-12 md:w-16 md:h-16 rounded-full border-4 border-dashed border-indigo-200 flex items-center justify-center text-2xl md:text-3xl font-black bg-indigo-50 shrink-0 text-indigo-500 shadow-inner" data-idx="${i}" data-ans="${p.ans}"></div>
+                    <div class="text-2xl md:text-4xl font-black w-20 md:w-32 text-left shrink-0 text-slate-700">${p.b}</div>
+                </div>`).join('');
+            
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-4 md:p-8 min-h-max bg-slate-50">
+                    <h2 class="text-xl md:text-3xl font-black mb-6 text-center text-indigo-800 uppercase tracking-wide">Lắp ghép Radar So Sánh 🎯</h2>
+                    <div class="flex-1 flex flex-col items-center w-full">${pairs}
+                        <div class="flex gap-4 md:gap-8 mt-4 md:mt-8 p-4 md:p-6 bg-white rounded-3xl shadow-lg border-2 border-indigo-100 flex-wrap justify-center" id="dock">
+                            ${['>','<','='].map(s => `<div class="drag-card sign w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-full flex justify-center items-center text-2xl md:text-4xl font-black shrink-0 shadow-[0_4px_0_#4338ca] hover:-translate-y-1 hover:shadow-[0_6px_0_#4338ca]" draggable="true" data-v="${s}">${s}</div>`).join('')}
+                        </div>
+                    </div>
+                    <div id="fb" class="min-h-[2.5rem] text-center text-base md:text-lg font-bold text-red-500 mt-6 px-4"></div>
+                    <div class="mt-auto flex justify-between w-full pt-4">
+                        <button class="btn-secondary text-sm md:text-base py-2 px-4 md:py-3 md:px-6" onclick="prevScreen()">Quay lại</button>
+                        <button id="btn-chk" class="btn-primary text-sm md:text-base py-2 px-4 md:py-3 md:px-8" onclick="chkDrag()">Kiểm tra Radar</button>
+                        <button id="btn-next" class="bg-gradient-to-r from-green-400 to-emerald-500 text-white font-black py-2 px-4 md:py-3 md:px-8 rounded-2xl hidden text-sm md:text-base shadow-[0_4px_0_#059669] hover:-translate-y-1" onclick="nextScreen()">Tiến lên! <i class="fa-solid fa-forward"></i></button>
+                    </div>
+                </div>`;
+            
+            let dragged = null;
+            document.querySelectorAll('.sign').forEach(el => {
+                el.ondragstart = function() { dragged = this.cloneNode(true); dragged.classList.remove('shadow-[0_4px_0_#4338ca]', 'hover:-translate-y-1'); dragged.onclick=function(){this.remove()}; }
+            });
+            document.querySelectorAll('.sign-zone').forEach(z => {
+                z.ondragover = e => { e.preventDefault(); z.classList.add('drag-over', 'bg-yellow-100'); };
+                z.ondragleave = () => z.classList.remove('drag-over', 'bg-yellow-100');
+                z.ondrop = function(e) {
+                    e.preventDefault(); this.classList.remove('drag-over', 'bg-yellow-100');
+                    if(dragged) { this.innerHTML=''; dragged.classList.add('w-full','h-full'); this.appendChild(dragged); dragged=null; playSFX('correct'); } // Tiny pop sound
+                };
+                z.onclick = function() { this.innerHTML=''; };
+            });
+            setTimeout(() => speakText('Thợ săn số ơi, kéo thả các dấu phép thuật vào ô tròn cho đúng nhé!'), 500);
+        }
+
+        function chkDrag() {
+            let ok = true, full = true, errZ = null;
+            document.querySelectorAll('.sign-zone').forEach(z => {
+                if(!z.children.length) full = false;
+                else if(z.children[0].dataset.v !== z.dataset.ans) { ok = false; errZ = z; }
+            });
+            const fb = document.getElementById('fb');
+            if(!full) { let msg="Khoan đã! Vẫn còn ô trống kìa đồng đội!"; fb.innerText=msg; return speakText(msg); }
+            if(ok) {
+                playSFX('correct'); let msg="Bùm! Lắp ráp chuẩn không cần chỉnh! Cậu có đôi mắt cú vọ đấy!"; fb.innerHTML=`<span class='text-green-600'>✨ ${msg}</span>`; speakText(msg); 
+                sessionData.score+=10; showNextBtn('btn-chk');
+            } else {
+                playSFX('wrong'); currentStageErrors++; errZ.classList.add('shake-error'); setTimeout(()=>errZ.classList.remove('shake-error'),500);
+                let msg="Ôi chao, radar báo lỗi rồi! Gợi ý này: Hãy dóng thẳng cột dấu phẩy từ trên xuống dưới để so sánh nhé!"; fb.innerText = `⚠️ ${msg}`; speakText(msg);
+                logError('drag', 'compare', 'Sai dấu');
+            }
+        }
+
+        // --- Màn mới: Chọn trong khoảng ---
+        function renderRange(c, d) {
+            const btns = d.opts.map((o, i) => `
+                <button class="bg-white border-b-4 border-orange-400 py-3 px-6 md:py-5 md:px-10 rounded-2xl text-xl md:text-3xl font-black text-orange-700 hover:bg-orange-50 hover:-translate-y-1 hover:shadow-lg transition-all active:translate-y-1 active:border-b-0" onclick="chkRange(${i}, ${d.ans}, this)">${o}</button>
+            `).join('');
+
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-4 md:p-8 bg-gradient-to-b from-orange-50 to-amber-50 min-h-max">
+                    <h2 class="text-xl md:text-3xl font-black mb-4 md:mb-6 text-center text-orange-800 uppercase tracking-wide"><i class="fa-solid fa-gas-pump text-orange-500 mr-2"></i> Trạm Sạc Năng Lượng</h2>
+                    <div class="bg-white border-l-8 border-orange-500 p-4 md:p-6 rounded-xl shadow-md mb-6 md:mb-10 mx-2 md:mx-0">
+                        <p class="text-base md:text-xl font-bold text-slate-700">Mật lệnh: <span class="text-orange-600">${d.q}</span></p>
+                    </div>
+                    <div class="flex justify-center gap-3 md:gap-6 mb-6 md:mb-8 items-center mx-2 bg-white p-4 rounded-full shadow-inner border-2 border-orange-100 max-w-2xl mx-auto w-full">
+                        <span class="text-lg md:text-2xl font-black text-slate-400 shrink-0 bg-slate-100 px-3 py-1 rounded-full">Km ${d.min}</span>
+                        <div class="flex-1 h-3 md:h-4 bg-slate-200 rounded-full overflow-hidden min-w-[40px] md:min-w-[50px] relative">
+                            <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmI5MjNjIj48L3JlY3Q+CjxwYXRoIGQ9Ik0wLDRMODQsMEwyLDhaIiBmaWxsPSIjZjliNzMxIj48L3BhdGg+Cjwvc3ZnPg==')] opacity-50 animate-[slide_1s_linear_infinite]"></div>
+                        </div>
+                        <span class="text-lg md:text-2xl font-black text-slate-400 shrink-0 bg-slate-100 px-3 py-1 rounded-full">Km ${d.max}</span>
+                    </div>
+                    <div class="flex flex-wrap justify-center gap-4 md:gap-8 mt-4 md:mt-8" id="range-opts">${btns}</div>
+                    <div id="range-fb" class="mt-6 md:mt-8 text-center text-base md:text-lg font-bold text-red-500 min-h-[2.5rem] px-4"></div>
+                    <div class="mt-auto flex justify-between w-full pt-4">
+                        <button class="btn-secondary text-sm md:text-base py-2 px-4 md:py-3 md:px-6" onclick="prevScreen()">Quay lại</button>
+                        <button id="btn-next" class="bg-gradient-to-r from-green-400 to-emerald-500 text-white font-black py-2 px-4 md:py-3 md:px-8 rounded-2xl hidden text-sm md:text-base shadow-[0_4px_0_#059669] hover:-translate-y-1" onclick="nextScreen()">Trạm tiếp theo <i class="fa-solid fa-forward"></i></button>
+                    </div>
+                </div>
+                <style>@keyframes slide { from { background-position: 0 0; } to { background-position: 16px 0; } }</style>
+                `;
+            setTimeout(() => speakText("Mật lệnh: " + d.q + " Nhớ dùng tuyệt chiêu quy đồng phần thập phân nhé!"), 500);
+        }
+
+        function chkRange(sel, ans, btn) {
+            const fb = document.getElementById('range-fb');
+            if(sel === ans) {
+                playSFX('correct'); btn.classList.replace('border-orange-400', 'border-green-500'); btn.classList.replace('text-orange-700', 'text-green-700'); btn.classList.add('bg-green-50');
+                let msg="Ting ting! Cắm sạc thành công! Cậu tìm đúng trạm rồi."; fb.innerHTML = `<span class='text-green-600'>🔋 ${msg}</span>`; speakText(msg);
+                sessionData.score+=10; document.getElementById('range-opts').classList.add('pointer-events-none'); showNextBtn();
+            } else {
+                playSFX('wrong'); btn.classList.add('shake-error'); setTimeout(()=>btn.classList.remove('shake-error'),500);
+                let msg="Ái chà, lạc đường rồi! Tuyệt chiêu này: Cậu thử thêm số 0 vào thành 3,50 và 3,80 xem số nào nằm lọt khe ở giữa nhé!"; fb.innerText = `🧭 ${msg}`; speakText(msg);
+                logError('range', 'between', 'Sai tìm số giữa khoảng');
+            }
+        }
+
+        function renderBridge(c, d) {
+            const bHtml = d.b.map((b, i) => `
+                <div class="flex flex-col items-center cursor-pointer hover:-translate-y-2 transition-transform shrink-0 group" onclick="chkBridge(${i}, ${d.ans}, this)">
+                    <div class="bridge-bg w-20 h-32 md:w-28 md:h-48 rounded-xl shadow-lg border-2 border-slate-400 flex items-center justify-center relative overflow-hidden group-hover:border-cyan-400">
+                        <div class="absolute inset-0 bg-cyan-400 opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                        <i class="fa-solid fa-car-side text-3xl md:text-4xl text-slate-700 group-hover:text-cyan-600 drop-shadow-md"></i>
+                    </div>
+                    <div class="mt-3 md:mt-4 bg-white border-b-4 border-cyan-500 font-black px-4 py-2 md:px-5 md:py-2 rounded-xl text-base md:text-xl text-slate-700 group-hover:bg-cyan-50 group-hover:text-cyan-700 shadow-sm">${b.t}</div>
+                </div>`).join('');
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-4 md:p-8 min-h-max bg-slate-100">
+                    <h2 class="text-xl md:text-3xl font-black text-center mb-6 md:mb-10 text-slate-800 uppercase tracking-wide"><i class="fa-solid fa-road-bridge text-cyan-500 mr-2"></i> ${d.q}</h2>
+                    <div class="flex flex-wrap justify-center gap-6 md:gap-16 mt-4" id="bridge-c">${bHtml}</div>
+                    <div id="b-fb" class="text-center font-bold text-base md:text-lg text-red-500 mt-8 md:mt-12 min-h-[2.5rem] px-4"></div>
+                    <div class="mt-auto flex justify-between w-full pt-4">
+                        <button class="btn-secondary text-sm md:text-base py-2 px-4 md:py-3 md:px-6" onclick="prevScreen()">Quay lại</button>
+                        <button id="btn-next" class="bg-gradient-to-r from-green-400 to-emerald-500 text-white font-black py-2 px-4 md:py-3 md:px-8 rounded-2xl hidden text-sm md:text-base shadow-[0_4px_0_#059669] hover:-translate-y-1" onclick="nextScreen()">Tiếp tục hành trình <i class="fa-solid fa-forward"></i></button>
+                    </div>
+                </div>`;
+            setTimeout(() => speakText(d.q), 500);
+        }
+
+        function chkBridge(sel, ans, el) {
+            const fb = document.getElementById('b-fb');
+            if(sel === ans) {
+                playSFX('correct'); 
+                el.querySelector('.bg-white').classList.replace('border-cyan-500', 'border-green-500'); 
+                el.querySelector('.bg-white').classList.replace('text-slate-700', 'text-green-700');
+                el.querySelector('.bg-white').classList.add('bg-green-100');
+                el.querySelector('.bridge-bg').classList.add('border-green-500');
+                let msg="Bánh xe lăn đều! Cầu này vừa vặn y chang, đi thôi!"; fb.innerHTML = `<span class='text-green-600'>🏎️ ${msg}</span>`; speakText(msg);
+                sessionData.score+=10; document.getElementById('bridge-c').classList.add('pointer-events-none'); showNextBtn();
+            } else {
+                playSFX('wrong'); el.classList.add('shake-error'); setTimeout(()=>el.classList.remove('shake-error'),500);
+                let msg="Két! Thắng gấp! Cầu này chưa phải ngắn nhất đâu. Nhớ dóng thẳng hàng phần mười cẩn thận xem nào!"; fb.innerText = `🛑 ${msg}`; speakText(msg); logError('bridge', 'length_bias', 'Sai chọn cầu');
+            }
+        }
+
+        function renderSort(c, d) {
+            const shuf = [...d.nums].sort(()=>Math.random()-0.5);
+            const slots = d.nums.map((_, i) => `<div class="drop-zone z-s w-[5rem] h-14 md:w-28 md:h-20 bg-slate-200 border-4 border-dashed border-slate-300 rounded-2xl flex items-center justify-center font-bold shrink-0 text-sm md:text-base shadow-inner relative"><span class="absolute text-slate-400 text-3xl opacity-30">${i+1}</span></div>`).join('');
+            const docks = shuf.map(n => `<div class="drag-card c-s w-[5rem] h-14 md:w-28 md:h-20 bg-white border-b-4 border-pink-500 rounded-2xl flex items-center justify-center font-black shrink-0 text-lg md:text-2xl text-slate-800 shadow-md hover:-translate-y-1 hover:shadow-lg relative z-10" draggable="true" data-v="${n}">${n}</div>`).join('');
+            
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-4 md:p-8 min-h-max bg-pink-50">
+                    <h2 class="text-xl md:text-3xl font-black mb-2 text-center md:text-left text-pink-800 uppercase tracking-wide"><i class="fa-solid fa-traffic-light text-pink-500 mr-2"></i> Trạm Thu Phí</h2>
+                    <p class="font-black text-pink-600 bg-white inline-block px-4 py-2 rounded-xl border-2 border-pink-200 text-center mx-auto mb-6 md:mb-10 text-sm md:text-lg shadow-sm">${d.type}</p>
+                    
+                    <div class="bg-white p-6 rounded-3xl border-4 border-pink-100 shadow-sm mb-6">
+                        <div class="flex flex-wrap justify-center gap-3 md:gap-6 mx-auto max-w-full" id="s-tar">${slots}</div>
+                    </div>
+                    
+                    <div class="flex flex-wrap justify-center gap-3 md:gap-6 mx-auto max-w-full bg-slate-100 p-4 rounded-2xl border-2 border-slate-200" id="s-dock">${docks}</div>
+                    
+                    <div id="s-fb" class="text-center font-bold text-red-500 mt-6 md:mt-8 min-h-[2.5rem] text-base md:text-lg px-4"></div>
+                    <div class="mt-auto flex justify-between w-full pt-4">
+                        <button class="btn-secondary text-sm md:text-base py-2 px-4 md:py-3 md:px-6 border-pink-400 text-pink-600 hover:bg-pink-100" onclick="prevScreen()">Quay lại</button>
+                        <button id="btn-chk" class="btn-primary py-2 px-4 md:py-3 md:px-8 text-sm md:text-base from-pink-400 to-rose-500 hover:from-pink-500 hover:to-rose-600 shadow-[0_6px_0_#be123c] active:shadow-[0_0px_0_#be123c]" onclick="chkSort('${d.correct.join(',')}')">Mở Barie!</button>
+                        <button id="btn-next" class="bg-gradient-to-r from-green-400 to-emerald-500 text-white font-black py-2 px-4 md:py-3 md:px-8 rounded-2xl hidden text-sm md:text-base shadow-[0_4px_0_#059669] hover:-translate-y-1" onclick="nextScreen()">Tiếp theo <i class="fa-solid fa-forward"></i></button>
+                    </div>
+                </div>`;
+                
+            let drg = null;
+            document.querySelectorAll('.c-s').forEach(el => {
+                el.ondragstart=function(){drg=this; setTimeout(()=>this.style.opacity='0.5',0)};
+                el.ondragend=function(){this.style.opacity='1'; drg=null;};
+                el.onclick=function(){
+                    if(this.parentNode.id==='s-dock'){ let e=Array.from(document.querySelectorAll('.z-s')).find(z=>!z.children.length); if(e) {e.appendChild(this); playSFX('correct');} }
+                    else { document.getElementById('s-dock').appendChild(this); playSFX('correct'); }
+                };
+            });
+            document.querySelectorAll('.z-s').forEach(z => {
+                z.ondragover=e=>{e.preventDefault(); z.classList.add('bg-pink-100', 'border-pink-300');};
+                z.ondragleave=()=>z.classList.remove('bg-pink-100', 'border-pink-300');
+                z.ondrop=function(e){ e.preventDefault(); this.classList.remove('bg-pink-100', 'border-pink-300'); if(drg){ if(this.children.length) document.getElementById('s-dock').appendChild(this.children[0]); this.appendChild(drg); playSFX('correct'); }};
+            });
+            document.getElementById('s-dock').ondragover=e=>e.preventDefault();
+            document.getElementById('s-dock').ondrop=function(e){e.preventDefault(); if(drg) {this.appendChild(drg); playSFX('correct');}};
+            setTimeout(() => speakText(`Xếp thứ tự xe đi qua trạm từ bé đến lớn nhé! Nhớ dóng phần nguyên trước nha.`), 500);
+        }
+
+        function chkSort(ansStr) {
+            let cur = []; document.querySelectorAll('.z-s').forEach(z => { if(z.children.length) cur.push(z.children[0].dataset.v); });
+            const fb = document.getElementById('s-fb');
+            if(cur.length < 4) { let msg="Bíp bíp! Phải xếp tất cả các xe lên làn đường đã chứ!"; fb.innerText=`🚗 ${msg}`; return speakText(msg); }
+            if(cur.join(',') === ansStr) {
+                playSFX('correct'); let msg="Chính xác! Barie đã mở. Đoàn xe xuất phát thẳng tắp, đỉnh của chóp!"; fb.innerHTML=`<span class='text-green-600'>✅ ${msg}</span>`; speakText(msg); 
+                sessionData.score+=15; showNextBtn('btn-chk');
+            } else {
+                playSFX('wrong'); document.getElementById('s-tar').classList.add('shake-error'); setTimeout(()=>document.getElementById('s-tar').classList.remove('shake-error'),500);
+                let msg="Kẹt xe rồi! Trật tự chưa đúng. Hãy nhớ quy tắc: Dóng hàng phần nguyên trước, ai nhỏ nhất nhường bước lên đầu nhé!"; fb.innerText = `🚧 ${msg}`; speakText(msg); logError('sort', 'logic', 'Xếp sai');
+            }
+        }
+
+        // --- Màn mới: Ghép cặp (Match) ---
+        let matchSel = null;
+        function renderMatch(c, d) {
+            const flat = []; d.pairs.forEach(p => flat.push(p[0], p[1]));
+            const shuf = flat.sort(() => Math.random() - 0.5);
+            
+            const cards = shuf.map((v, i) => `
+                <div class="match-card bg-white border-b-8 border-teal-300 rounded-2xl shadow-md p-2 md:p-4 text-2xl md:text-4xl font-black text-teal-800 flex justify-center items-center h-20 md:h-28 hover:-translate-y-1 hover:shadow-lg active:translate-y-1 active:border-b-0" data-v="${v}" onclick="onMatchClick(this)">${v}</div>
+            `).join('');
+
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-4 md:p-8 bg-teal-50 min-h-max">
+                    <h2 class="text-xl md:text-3xl font-black mb-3 md:mb-4 text-center text-teal-800 uppercase tracking-wide"><i class="fa-solid fa-mask text-teal-500 mr-2"></i> Lật tẩy Ninja Số 0</h2>
+                    <div class="bg-teal-100 p-3 md:p-4 rounded-xl border-2 border-teal-200 mb-6 md:mb-8 text-center max-w-xl mx-auto shadow-sm">
+                        <p class="text-xs md:text-base text-teal-900 font-bold px-2">Bí kíp: Thêm hay bớt số 0 ở tận cùng bên phải phần thập phân <span class="text-red-500 font-black">KHÔNG</span> làm đổi giá trị. Hãy tìm các cặp số bằng nhau!</p>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 max-w-2xl mx-auto w-full px-2 md:px-0" id="match-grid">${cards}</div>
+                    <div id="m-fb" class="text-center font-bold text-red-500 mt-6 md:mt-8 min-h-[3rem] text-base md:text-xl px-4 flex items-center justify-center"></div>
+                    <div class="mt-auto flex justify-between w-full pt-4">
+                        <button class="btn-secondary text-sm md:text-base py-2 px-4 md:py-3 md:px-6 border-teal-400 text-teal-600 hover:bg-teal-100" onclick="prevScreen()">Quay lại</button>
+                        <button id="btn-next" class="bg-gradient-to-r from-green-400 to-emerald-500 text-white font-black py-2 px-4 md:py-3 md:px-8 rounded-2xl hidden text-sm md:text-base shadow-[0_4px_0_#059669] hover:-translate-y-1" onclick="nextScreen()">Tới phòng Boss <i class="fa-solid fa-skull text-yellow-300 ml-1"></i></button>
+                    </div>
+                </div>`;
+            matchSel = null;
+            setTimeout(() => speakText('Cậu hãy bấm chọn 2 số có giá trị bằng nhau để lật tẩy chúng nhé. Nhớ kỹ bí kíp Ninja Số 0 tận cùng nha!'), 500);
+        }
+
+        function onMatchClick(el) {
+            if(el.classList.contains('matched') || el.classList.contains('selected')) return;
+            playSFX('correct'); 
+            el.classList.add('selected');
+            el.classList.replace('border-teal-300', 'border-cyan-400');
+            
+            if(!matchSel) {
+                matchSel = el;
+            } else {
+                const v1 = matchSel.dataset.v;
+                const v2 = el.dataset.v;
+                const pairs = SCREENS[currentScreenIndex].data.pairs;
+                const isMatch = pairs.some(p => (p[0]===v1 && p[1]===v2) || (p[0]===v2 && p[1]===v1));
+                
+                const fb = document.getElementById('m-fb');
+                if(isMatch) {
+                    playSFX('correct');
+                    matchSel.classList.remove('selected', 'border-cyan-400'); el.classList.remove('selected', 'border-cyan-400');
+                    matchSel.classList.add('matched', 'border-green-400', 'animate-pop'); el.classList.add('matched', 'border-green-400', 'animate-pop');
+                    let msg = "Tuyệt! Lớp ngụy trang số 0 đã bị cậu nhìn thấu!";
+                    sessionData.score += 5;
+                    
+                    if(document.querySelectorAll('.matched').length === pairs.length * 2) {
+                        msg = "Tuyệt đỉnh! Số 0 tận cùng chỉ làm 'màu' thôi, giá trị không đổi. Cậu giỏi quá!";
+                        showNextBtn();
+                    }
+                    fb.innerHTML = `<span class='text-green-600'>🥷 ${msg}</span>`; speakText(msg);
+                } else {
+                    playSFX('wrong');
+                    el.classList.add('shake-error', 'bg-red-100', 'border-red-400'); matchSel.classList.add('shake-error', 'bg-red-100', 'border-red-400');
+                    let msg = "Chưa khớp rồi! Hãy dùng 'kính lúp' soi kỹ xem chúng có thực sự bằng nhau không nhé!"; fb.innerText = `❌ ${msg}`; speakText(msg);
+                    logError('match', 'zero_logic', `${v1} != ${v2}`);
+                    setTimeout(() => {
+                        el.classList.remove('selected', 'shake-error', 'bg-red-100', 'border-red-400', 'border-cyan-400'); 
+                        if(matchSel) matchSel.classList.remove('selected', 'shake-error', 'bg-red-100', 'border-red-400', 'border-cyan-400');
+                        matchSel = null;
+                    }, 1000);
+                    return; 
+                }
+                matchSel = null;
+            }
+        }
+
+        function renderSpeed(c, d) {
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col p-4 md:p-8 bg-gradient-to-br from-indigo-900 to-purple-900 min-h-max relative overflow-hidden">
+                    <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
+                    <h2 class="text-2xl md:text-4xl font-black text-yellow-400 mb-6 md:mb-10 text-center uppercase tracking-widest drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] z-10 animate-pulse"><i class="fa-solid fa-dragon mr-2"></i> Trùm Cuối: Bẫy Độ Dài</h2>
+                    
+                    <div class="bg-white/10 backdrop-blur-md p-6 md:p-10 rounded-[3rem] border-4 border-purple-400/50 flex flex-col items-center mx-2 md:mx-0 shadow-[0_0_30px_rgba(168,85,247,0.4)] z-10">
+                        <div class="flex items-center justify-center gap-3 md:gap-6 mb-8 md:mb-12 w-full">
+                            <div class="bg-white px-4 py-3 md:px-8 md:py-6 rounded-2xl md:rounded-3xl shadow-xl border-b-8 border-indigo-200">
+                                <span class="text-4xl md:text-6xl font-black text-indigo-800 shrink-0">${d.a}</span>
+                            </div>
+                            <div class="w-16 h-16 md:w-24 md:h-24 bg-purple-900/50 rounded-full border-4 border-dashed border-yellow-400 flex items-center justify-center text-3xl md:text-5xl font-black text-yellow-300 shrink-0 mx-1 md:mx-4 shadow-[0_0_15px_rgba(250,204,21,0.5)] animate-bounce" id="sp-sl">?</div>
+                            <div class="bg-white px-4 py-3 md:px-8 md:py-6 rounded-2xl md:rounded-3xl shadow-xl border-b-8 border-indigo-200">
+                                <span class="text-4xl md:text-6xl font-black text-indigo-800 shrink-0">${d.b}</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 md:gap-8 w-full max-w-lg" id="sp-opt">
+                            ${['>','<','='].map(s=>`<button class="flex-1 py-4 md:py-6 bg-gradient-to-b from-yellow-300 to-orange-500 text-white rounded-2xl md:rounded-3xl text-3xl md:text-5xl font-black shadow-[0_6px_0_#c2410c] hover:-translate-y-2 hover:shadow-[0_10px_0_#c2410c] active:translate-y-2 active:shadow-none transition-all border-2 border-yellow-200" onclick="chkSpd('${s}','${d.ans}')">${s}</button>`).join('')}
+                        </div>
+                    </div>
+                    <div id="sp-fb" class="min-h-[4rem] text-lg md:text-2xl font-bold text-red-300 text-center mt-6 md:mt-10 px-2 z-10 bg-black/30 rounded-xl py-3 max-w-2xl mx-auto w-full"></div>
+                    <div class="mt-auto flex justify-between w-full pt-4 z-10">
+                        <button class="bg-white/20 text-white hover:bg-white/30 py-2 px-4 md:py-3 md:px-6 rounded-2xl font-bold text-sm md:text-base backdrop-blur-sm transition-colors" onclick="prevScreen()">Quay lại</button>
+                        <button id="btn-next" class="bg-gradient-to-r from-yellow-400 to-yellow-600 text-indigo-900 font-black py-2 px-4 md:py-3 md:px-8 rounded-2xl hidden text-sm md:text-base shadow-[0_0_20px_rgba(250,204,21,0.8)] animate-pop" onclick="nextScreen()">Nhận Thưởng! <i class="fa-solid fa-trophy ml-2"></i></button>
+                    </div>
+                </div>`;
+            setTimeout(() => speakText("Cảnh báo! Trùm cuối xuất hiện! Cẩn thận bẫy độ dài: Số dài hơn chưa chắc đã lớn hơn đâu nhé. Đừng vội vàng!"), 500);
+        }
+
+        function chkSpd(s, a) {
+            let sl = document.getElementById('sp-sl');
+            sl.innerText = s;
+            sl.classList.remove('animate-bounce', 'border-dashed');
+            sl.classList.add('bg-yellow-400', 'text-indigo-900', 'border-solid');
+            
+            const fb = document.getElementById('sp-fb');
+            if(s===a) {
+                playSFX('correct'); let msg="BÙM! Bẫy tàng hình bị bẻ gãy! Cậu đích thực là Kiện tướng Số Thập Phân!"; fb.innerHTML=`<span class='text-yellow-300'>🌟 ${msg}</span>`; speakText(msg);
+                document.getElementById('sp-opt').classList.add('pointer-events-none', 'opacity-50');
+                sessionData.score+=20; sessionData.badges.push('Kiện Tướng'); showNextBtn();
+            } else {
+                playSFX('wrong'); let msg="Á á sập bẫy! Khoan vội xuất chiêu, thêm ngay số 0 vào số ngắn hơn rồi mới so sánh lại xem!"; fb.innerHTML = `<span class='text-red-400'>💥 ${msg}</span>`; speakText(msg);
+                sl.classList.add('shake-error', 'bg-red-500', 'text-white', 'border-red-600');
+                setTimeout(()=> {
+                    sl.classList.remove('shake-error', 'bg-red-500', 'text-white', 'border-red-600', 'bg-yellow-400', 'text-indigo-900', 'border-solid');
+                    sl.classList.add('bg-purple-900/50', 'text-yellow-300', 'border-dashed');
+                    sl.innerText = '?';
+                }, 1500);
+                logError('speed', 'trap', 'Mắc bẫy độ dài');
+            }
+        }
+
+        function renderSummary(c) {
+            c.innerHTML = `
+                <div class="flex-1 flex flex-col items-center justify-center p-4 md:p-8 bg-gradient-to-t from-green-100 to-emerald-50 relative overflow-y-auto min-h-max py-10">
+                    <!-- Confetti effect base -->
+                    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHBhdGggZD0iTTAgMGg0MHY0MEgweiIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iMTAiIHI9IjIiIGZpbGw9IiNmY2E1YTEiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSIyIiBmaWxsPSIjNGRkMGUxIi8+PC9zdmc+')] opacity-60"></div>
+                    
+                    <h1 class="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-600 mb-6 md:mb-10 text-center uppercase tracking-widest drop-shadow-sm z-10 animate-pop py-2 mt-4 leading-normal">Chiến thắng rực rỡ! <i class="fa-solid fa-medal text-yellow-400"></i></h1>
+                    
+                    <div class="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-2xl w-full max-w-md border-8 border-green-100 text-center mx-4 z-10 relative mt-8">
+                        <div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 text-5xl p-4 rounded-full border-4 border-white shadow-lg"><i class="fa-solid fa-star"></i></div>
+                        
+                        <p class="text-base md:text-xl text-slate-500 font-black mb-2 mt-4 uppercase tracking-widest">Điểm vinh quang</p>
+                        <p class="text-7xl md:text-8xl font-black text-emerald-500 mb-6 md:mb-8 drop-shadow-md">${sessionData.score}</p>
+                        <div class="h-1 w-20 bg-emerald-200 mx-auto rounded-full mb-6"></div>
+                        <p class="text-base md:text-lg text-slate-700 font-bold leading-relaxed">Tuyệt đỉnh Thợ Săn Số! Cậu đã đập tan mọi bẫy độ dài và làm chủ hoàn toàn quy tắc dóng hàng. Robo Phẩy tự hào về cậu!</p>
+                    </div>
+                    <button class="mt-8 md:mt-12 bg-gradient-to-b from-cyan-400 to-blue-500 text-white font-black text-lg md:text-xl py-4 px-8 md:py-5 md:px-12 rounded-full shadow-[0_8px_0_#0284c7] hover:-translate-y-2 hover:shadow-[0_12px_0_#0284c7] active:translate-y-2 active:shadow-none transition-all z-10 border-2 border-white/30" onclick="location.reload()">Chơi Lại Trạm Này <i class="fa-solid fa-rotate-right ml-2"></i></button>
+                </div>`;
+            speakText(`Chúc mừng Thợ Săn Số Thập Phân! Thành tích của cậu sáng chói luôn! Cậu đã xuất sắc giành được ${sessionData.score} điểm vinh quang!`);
+            saveTeacherData();
+        }
+
+        // --- Teacher Mode & Storage ---
+        function logError(stg, type, det) { sessionData.errorsLogged.push({ stage: stg, errorType: type, detail: det, time: new Date().toISOString() }); }
+        function saveTeacherData() { localStorage.setItem(APP_ID + '_cur', JSON.stringify(sessionData)); }
+        function loadTeacherData() { if(!localStorage.getItem(APP_ID + '_hist')) localStorage.setItem(APP_ID + '_hist', JSON.stringify([])); }
+        
+        function handleTeacherTrigger() {
+            clickCountForTeacher++; clearTimeout(teacherTimer); teacherTimer = setTimeout(()=>clickCountForTeacher=0, 2000);
+            if(clickCountForTeacher>=5) { clickCountForTeacher=0; openTM(); }
+        }
+        function openTM() {
+            document.getElementById('teacher-modal').classList.remove('hidden');
+            const cur = JSON.parse(localStorage.getItem(APP_ID + '_cur') || JSON.stringify(sessionData));
+            document.getElementById('tm-avg').innerText = cur.score;
+            document.getElementById('tm-err-dec').innerText = cur.errorsLogged.filter(e=>e.errorType==='compare').length;
+            document.getElementById('tm-err-len').innerText = cur.errorsLogged.filter(e=>e.errorType==='trap' || e.errorType==='length_bias').length;
+            document.getElementById('tm-error-list').innerHTML = cur.errorsLogged.map(e=>`<li class="bg-red-50 p-2 border border-red-100 rounded-md"><span class="font-bold text-red-600">[${e.stage}]</span> ${e.detail}</li>`).join('');
+        }
+        function closeTeacherMode() { document.getElementById('teacher-modal').classList.add('hidden'); }
+        function switchTeacherTab(id) { ['stats','errors','objectives'].forEach(i=>document.getElementById('tab-'+i).classList.add('hidden')); document.getElementById('tab-'+id).classList.remove('hidden'); }
+        
+        function exportData(type) {
+            const cur = JSON.parse(localStorage.getItem(APP_ID + '_cur') || JSON.stringify(sessionData));
+            let dataStr = ""; let mime = ""; let ext = "";
+            if(type === 'json') {
+                dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cur, null, 2));
+                mime = "robo_phay_tram2_data.json";
+            } else if (type === 'csv') {
+                let csv = "Time,Stage,Error Type,Detail\n";
+                cur.errorsLogged.forEach(e => csv += `${e.time},${e.stage},${e.errorType},"${e.detail}"\n`);
+                dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+                mime = "robo_phay_tram2_errors.csv";
+            }
+            const node = document.createElement('a'); node.setAttribute("href", dataStr); node.setAttribute("download", mime);
+            document.body.appendChild(node); node.click(); node.remove();
+        }
+        function resetData() { if(confirm("Xóa toàn bộ dữ liệu?")) { localStorage.removeItem(APP_ID + '_hist'); localStorage.removeItem(APP_ID + '_cur'); location.reload(); } }
+
+        function unlockAPI() {
+            const p = document.getElementById('api-password').value.trim();
+            if(p === atob(ENCRYPTED_PAYLOAD).split('|')[0]) { gcpApiKey = atob(ENCRYPTED_PAYLOAD).split('|')[1]; document.getElementById('auth-modal').classList.add('hidden'); initApp(); }
+            else { document.getElementById('api-password').classList.add('shake-error'); setTimeout(()=>document.getElementById('api-password').classList.remove('shake-error'), 500); }
+        }
+        function skipAuth() { document.getElementById('auth-modal').classList.add('hidden'); initApp(); }
+        document.getElementById('api-password').onkeypress = e => { if(e.key==='Enter') unlockAPI(); };
+        window.onload = () => {};
+    </script>
+</body>
+</html>

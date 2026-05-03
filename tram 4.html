@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trạm 4: Đấu Trường Cuối - Robo Phẩy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800;900&display=swap');
+        
+        body { font-family: 'Nunito', sans-serif; background: #1e1b4b; user-select: none; overflow-x: hidden; color: #333; }
+
+        /* Arena Theme Backgrounds */
+        .bg-arena { background: radial-gradient(circle at center, #4c1d95 0%, #1e1b4b 100%); }
+        .bg-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+
+        /* Animations */
+        @keyframes floating { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        .animate-float { animation: floating 3s ease-in-out infinite; }
+        
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 15px #fef08a; } 50% { box-shadow: 0 0 30px #eab308; } }
+        .glow-effect { animation: pulse-glow 2s infinite; }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-5px); } }
+        .shake-error { animation: shake 0.5s; border-color: #ef4444 !important; background-color: #fef2f2 !important; color: #ef4444 !important;}
+        
+        /* Playful hover animations */
+        .hover-pop { transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .hover-pop:hover { transform: scale(1.03) translateY(-2px); }
+
+        /* UI */
+        .btn-primary { @apply bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-black py-3 px-6 rounded-2xl shadow-[0_4px_0_#ca8a04] active:shadow-[0_0px_0_#ca8a04] active:translate-y-1 transition-all text-lg hover-pop; }
+        .btn-choice { @apply bg-white border-4 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-400 py-4 px-6 rounded-2xl text-2xl font-black text-indigo-800 transition-transform shadow-sm w-full hover-pop; }
+        
+        /* Progress Bar */
+        .step-indicator { @apply w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-all duration-500; }
+        .step-active { @apply bg-yellow-400 border-yellow-200 text-yellow-900 shadow-[0_0_10px_#fef08a]; transform: scale(1.2); }
+        .step-done { @apply bg-green-500 border-green-300 text-white; }
+        .step-wait { @apply bg-indigo-900 border-indigo-700 text-indigo-300; }
+        .step-line { @apply h-1 flex-1 bg-indigo-900 transition-colors duration-500; }
+        .line-done { @apply bg-green-500; }
+
+        /* Drag Drop for Sort */
+        .drag-card { cursor: grab; transition: transform 0.1s; z-index: 10;}
+        .drag-card:active { cursor: grabbing; transform: scale(1.05) rotate(2deg); }
+        .drop-zone { transition: all 0.3s; }
+        .drop-zone.drag-over { background-color: #fef08a; border-color: #eab308; transform: scale(1.05); }
+
+        .speech-bubble { position: relative; background: white; border-radius: 1em; }
+        .speech-bubble:after { content: ''; position: absolute; bottom: 0; left: 20%; width: 0; height: 0; border: 20px solid transparent; border-top-color: white; border-bottom: 0; border-left: 0; margin-left: -10px; margin-bottom: -20px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col items-center justify-center relative bg-arena">
+
+    <!-- Header -->
+    <div class="fixed top-0 w-full max-w-4xl p-4 flex justify-between items-center z-50">
+        <div class="flex items-center gap-2 cursor-pointer hover-pop" onclick="handleTeacherTrigger()">
+            <div class="bg-yellow-400 p-2 rounded-full shadow-[0_0_15px_#fef08a]">
+                <i class="fa-solid fa-trophy text-yellow-900 text-xl"></i>
+            </div>
+            <span class="font-extrabold text-yellow-400 tracking-wider text-lg drop-shadow-md">ĐẤU TRƯỜNG CUỐI</span>
+        </div>
+        <div class="flex gap-3">
+            <button class="bg-indigo-900/80 border border-indigo-700 p-3 rounded-full shadow-md text-indigo-200 hover:text-white hover:bg-indigo-800 transition-all hover-pop" onclick="goHome()" title="Trang chủ">
+                <i class="fa-solid fa-house text-xl"></i>
+            </button>
+            <button class="bg-indigo-900/80 border border-indigo-700 p-3 rounded-full shadow-md text-indigo-200 hover:text-yellow-400 hover:bg-indigo-800 transition-all hover-pop" onclick="toggleGlobalAudio()">
+                <i id="audio-icon" class="fa-solid fa-volume-high text-xl"></i>
+            </button>
+            <button class="bg-indigo-900/80 border border-indigo-700 p-3 rounded-full shadow-md text-indigo-200 hover:text-green-400 hover:bg-indigo-800 transition-all hover-pop" onclick="playCurrentHint()">
+                <i class="fa-solid fa-circle-info text-xl"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div id="app-container" class="w-full max-w-4xl h-[85vh] mt-16 bg-card rounded-3xl shadow-2xl overflow-y-auto overflow-x-hidden relative flex flex-col border-4 border-indigo-300">
+        <!-- JS Injects Here -->
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Teacher Modal -->
+    <div id="teacher-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 z-[100] flex items-center justify-center">
+        <div class="bg-white w-11/12 max-w-3xl h-[80vh] rounded-2xl p-6 flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-chalkboard-user mr-2 text-indigo-600"></i>Chế độ Giáo Viên - Trạm 4 (Tổng Ôn)</h2>
+                <button onclick="closeTeacherMode()" class="text-gray-500 hover:text-red-500 text-2xl hover-pop"><i class="fa-solid fa-times"></i></button>
+            </div>
+            
+            <div class="flex border-b mb-4 gap-2 overflow-x-auto">
+                <button class="px-4 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 shrink-0" onclick="switchTeacherTab('stats')">Kỹ năng & Thống kê</button>
+                <button class="px-4 py-2 font-bold text-gray-500 hover:text-indigo-600 shrink-0" onclick="switchTeacherTab('errors')">Lỗi phổ biến</button>
+                <button class="px-4 py-2 font-bold text-gray-500 hover:text-indigo-600 shrink-0" onclick="switchTeacherTab('objectives')">Mục tiêu</button>
+            </div>
+
+            <div id="tab-stats" class="flex-1 overflow-y-auto">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-50 p-3 rounded-xl border border-blue-200 text-center"><p class="text-xs font-bold text-blue-600">Cấu tạo số</p><p class="text-2xl font-black text-blue-800" id="tm-skill-read">0%</p></div>
+                    <div class="bg-green-50 p-3 rounded-xl border border-green-200 text-center"><p class="text-xs font-bold text-green-600">So sánh</p><p class="text-2xl font-black text-green-800" id="tm-skill-compare">0%</p></div>
+                    <div class="bg-orange-50 p-3 rounded-xl border border-orange-200 text-center"><p class="text-xs font-bold text-orange-600">Đo lường</p><p class="text-2xl font-black text-orange-800" id="tm-skill-measure">0%</p></div>
+                    <div class="bg-purple-50 p-3 rounded-xl border border-purple-200 text-center"><p class="text-xs font-bold text-purple-600">Làm tròn</p><p class="text-2xl font-black text-purple-800" id="tm-skill-round">0%</p></div>
+                </div>
+                <div class="flex justify-between items-center bg-gray-100 p-4 rounded-xl mb-6">
+                    <div><p class="font-bold text-gray-600">Tổng điểm:</p><p class="text-3xl font-black text-indigo-700" id="tm-avg">0</p></div>
+                    <div><p class="font-bold text-gray-600">Thời gian:</p><p class="text-3xl font-black text-indigo-700" id="tm-time">0p</p></div>
+                </div>
+                <div class="flex gap-4 flex-wrap">
+                    <button class="bg-blue-500 text-white font-bold py-2 px-4 rounded hover-pop" onclick="exportData('json')">Xuất JSON</button>
+                    <button class="bg-green-500 text-white font-bold py-2 px-4 rounded hover-pop" onclick="exportData('csv')">Xuất CSV Lỗi</button>
+                    <button id="btn-reset-data" class="bg-red-500 text-white font-bold py-2 px-4 rounded ml-auto hover-pop" onclick="resetData()">Xóa Dữ Liệu</button>
+                </div>
+            </div>
+
+            <div id="tab-errors" class="flex-1 overflow-y-auto hidden">
+                <ul class="space-y-3" id="tm-error-list"></ul>
+            </div>
+             <div id="tab-objectives" class="flex-1 overflow-y-auto hidden">
+                <h3 class="font-bold mb-2">Mục tiêu Trạm 4 (Tổng Ôn):</h3>
+                <ul class="list-disc pl-5 text-gray-700 space-y-1">
+                    <li>Kiểm tra tổng hợp: Đọc, viết, cấu tạo số thập phân.</li>
+                    <li>Kiểm tra kỹ năng so sánh, sắp xếp dãy số và nhận diện số bằng nhau.</li>
+                    <li>Kiểm tra kỹ năng chuyển đổi đơn vị đo lường thực tế.</li>
+                    <li><b>Đặc biệt:</b> Thực hành và nắm vững quy tắc <b>làm tròn số thập phân</b> (đến số tự nhiên, phần mười).</li>
+                    <li>Phát triển tư duy qua bài toán kết hợp nhiều bước ở vòng Boss.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-80 z-[200] flex items-center justify-center">
+        <div class="bg-white w-11/12 max-w-md rounded-3xl p-8 flex flex-col items-center text-center shadow-2xl border-4 border-indigo-400">
+            <div class="text-6xl mb-4 glow-effect rounded-full animate-float">🤖</div>
+            <h2 class="text-2xl font-black text-indigo-800 mb-6">Mật mã Đấu Trường</h2>
+            <input type="password" id="api-password" class="w-full border-4 border-indigo-200 rounded-2xl p-4 text-center text-2xl font-bold mb-4 focus:outline-none focus:border-indigo-500" placeholder="Mật khẩu...">
+            <div class="flex gap-4 w-full">
+                <button class="flex-1 bg-gray-200 hover:bg-gray-300 font-bold py-3 rounded-2xl hover-pop" onclick="skipAuth()">Bỏ qua</button>
+                <button class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-2xl hover-pop" onclick="unlockAPI()">Kích hoạt</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA & STATE ---
+        let gcpApiKey = null;
+        let gcpApiFailed = false; // Ngăn chặn việc gọi API liên tục nếu Google đã báo lỗi (chặn/hết hạn)
+        const ENCRYPTED_PAYLOAD = "YWRtaW58QUl6YVN5Q0hrZElrYy10WklZUGx5emdQTFZ3bXZSSk91T2toeWVF";
+        const APP_ID = 'robo_phay_tram4_final';
+        let isAudioEnabled = true;
+        let currentScreenIndex = 0;
+        let currentStageErrors = 0;
+        let clickCountForTeacher = 0, teacherTimer = null;
+        let currentHintText = "";
+        let sessionStartTime = null;
+        let currentAudio = null;
+        let currentSpeechId = 0; // Tránh chồng chéo âm thanh khi click liên tục
+
+        let sessionData = { 
+            score: 0, timeSpent: 0, 
+            skills: { readWrite: {c:0, t:0}, compare: {c:0, t:0}, measure: {c:0, t:0}, round: {c:0, t:0}, boss: {c:0, t:0} },
+            errorsLogged: [], badges: [] 
+        };
+
+        const SCREENS = [
+            { id: 'intro', type: 'intro', step: 0 },
+            // V1: Cấu tạo số
+            { id: 'v1_1', type: 'mcq', skill: 'readWrite', step: 1, title: "Vòng 1: Cổng Chữ Số", data: { 
+                q: "Số gồm 3 chục, 5 đơn vị, 2 phần mười và 4 phần nghìn viết là:", 
+                opts: ["35,24", "35,204", "35,024"], ans: 1, trapIdx: 0, 
+                hint: "Cậu để ý nhé: Hàng phần trăm không được nhắc đến, tức là nó 'vắng mặt' và bằng 0. Dấu phẩy nằm ngay sau lưng hàng đơn vị kìa!" 
+            }},
+            { id: 'v1_2', type: 'mcq', skill: 'readWrite', step: 1, title: "Vòng 1: Cổng Chữ Số", data: { 
+                q: "Số thập phân 'Một trăm hai mươi lăm phẩy không tám' viết là:", 
+                opts: ["125,8", "125,08", "10025,08"], ans: 1, trapIdx: 0, 
+                hint: "Khoan chốt vội nha! Phần thập phân 'không tám' nghĩa là có chữ số 0 đứng canh ở hàng phần mười, còn số 8 lùi lại hàng phần trăm đấy." 
+            }},
+            { id: 'v1_3', type: 'mcq', skill: 'readWrite', step: 1, title: "Vòng 1: Cổng Chữ Số", data: { 
+                q: "Trong số thập phân 86,324, chữ số 2 thuộc hàng nào?", 
+                opts: ["Hàng phần mười", "Hàng phần trăm", "Hàng phần nghìn"], ans: 1, trapIdx: 0, 
+                hint: "Mẹo nhỏ nè: Đếm từ dấu phẩy sang phải nhé. Cạnh phẩy là phần mười, đứng thứ hai là phần trăm, xếp thứ ba là phần nghìn!" 
+            }},
+            // V2: So sánh
+            { id: 'v2_1', type: 'sort', skill: 'compare', step: 2, title: "Vòng 2: Cầu So Sánh", data: { 
+                nums: ["3,604", "2,875", "2,857", "3,106"], correct: ["2,857", "2,875", "3,106", "3,604"], type: "TỪ BÉ ĐẾN LỚN",
+                hint: "Đừng vội nhìn hoa mắt nha! Hãy gom nhóm phần nguyên 2 lại so sánh với nhau trước. Xong rồi mới tới nhóm phần nguyên 3."
+            }},
+            { id: 'v2_2', type: 'mcq', skill: 'compare', step: 2, title: "Vòng 2: Phép Thuật Số 0", data: { 
+                q: "Số thập phân nào dưới đây có giá trị BẰNG với 0,7 ?", 
+                opts: ["0,07", "7,0", "0,700"], ans: 2, trapIdx: 0, 
+                hint: "Thần chú số thập phân: 'Thêm hay bớt bao nhiêu số 0 ở tít tận cùng bên phải phần thập phân thì giá trị cũng chẳng hề thay đổi'." 
+            }},
+            { id: 'v2_3', type: 'mcq', skill: 'compare', step: 2, title: "Vòng 2: Cầu So Sánh", data: { 
+                q: "Số thập phân LỚN NHẤT trong các số 4,52 ; 4,25 ; 4,502 ; 4,052 là:", 
+                opts: ["4,52", "4,502", "4,052"], ans: 0, trapIdx: 1, 
+                hint: "Bí kíp so sánh: So phần mười trước (5=5). Rẽ sang so tiếp phần trăm (2 lớn hơn 0). Vậy là phân định thắng thua rồi nhé!" 
+            }},
+            // V3: Đo lường
+            { id: 'v3_1', type: 'input', skill: 'measure', step: 3, title: "Vòng 3: Xưởng Đo Lường", data: { 
+                q: "1 kg 250 g = ... kg", unit: "kg", ans: "1,25", ansAlt: "1,250", 
+                hint: "Dễ ợt nè: 1kg giữ nguyên ở phần nguyên. 250g bé xíu kia chính là 250 phần nghìn kg, viết ngay sau dấu phẩy là đẹp!" 
+            }},
+            { id: 'v3_2', type: 'input', skill: 'measure', step: 3, title: "Vòng 3: Xưởng Đo Lường", data: { 
+                q: "3 m 5 cm = ... m", unit: "m", ans: "3,05", ansAlt: "3,05", 
+                hint: "Khúc này hay bẫy lắm nha! 3m ở phần nguyên. Còn 5cm = 5 phần trăm mét (tức là cột cm có số 5, còn cột dm trống rỗng phải điền số 0)." 
+            }},
+            { id: 'v3_3', type: 'input', skill: 'measure', step: 3, title: "Vòng 3: Xưởng Đo Lường", data: { 
+                q: "5 tấn 42 kg = ... tấn", unit: "tấn", ans: "5,042", ansAlt: "5,042", 
+                hint: "Thử nhớ lại xem 1 tấn bằng bao nhiêu kg nào? 1000kg đúng không? Vậy 42kg là 42 phần nghìn tấn, nghĩa là hàng tạ (phần mười) bị thiếu số 0 đó!" 
+            }},
+            // V4: Làm tròn
+            { id: 'v4_1', type: 'mcq', skill: 'round', step: 4, title: "Vòng 4: Vườn Làm Tròn", data: { 
+                q: "Làm tròn số 4,72 đến số tự nhiên gần nhất:", 
+                opts: ["4", "5", "4,7"], ans: 1, trapIdx: 0, 
+                hint: "Luật làm tròn nè: Nhìn vào hàng phần mười là số 7. Vì 7 từ 5 trở lên, nên ta 'tặng' ngay 1 đơn vị cho phần nguyên: 4 + 1 = 5." 
+            }},
+            { id: 'v4_2', type: 'mcq', skill: 'round', step: 4, title: "Vòng 4: Vườn Làm Tròn", data: { 
+                q: "Làm tròn số 135,74 đến hàng phần mười:", 
+                opts: ["135,7", "135,8", "136"], ans: 0, trapIdx: 1, 
+                hint: "Làm tròn đến phần mười thì ngó sang ông hàng xóm phần trăm (số 4). Vì 4 nhỏ hơn 5 nên ông phần mười (7) không được tăng lên đâu nha." 
+            }},
+            { id: 'v4_3', type: 'mcq', skill: 'round', step: 4, title: "Vòng 4: Vườn Làm Tròn", data: { 
+                q: "Làm tròn số 8,96 đến hàng phần mười ta được:", 
+                opts: ["8,9", "9,0", "8,90"], ans: 1, trapIdx: 0, 
+                hint: "Ca này khó đây! Nhìn hàng phần trăm là 6 (lớn hơn 5). Cộng 1 vào hàng phần mười: 9 + 1 = 10. Thế là phải 'nhớ' 1 sang phần nguyên, biến thành 9,0." 
+            }},
+            // Boss
+            { id: 'boss', type: 'boss', skill: 'boss', step: 5, title: "Trùm Cuối: Hộp Quà Bí Ẩn", data: { 
+                context: "Chiếc hộp bí mật chứa Huy hiệu Quán Quân có khối lượng chuẩn để qua cửa là từ 3,4 kg đến 3,8 kg. Cân điện tử hiện chính xác khối lượng hộp của cậu là:",
+                weight: "3kg 540g"
+            }},
+            { id: 'summary', type: 'summary', step: 6 }
+        ];
+
+        // --- TOAST NOTIFICATIONS ---
+        function showToast(msg, type='info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'error' ? 'bg-red-500' : (type === 'success' ? 'bg-green-500' : 'bg-indigo-600');
+            const iconClass = type === 'error' ? 'fa-triangle-exclamation' : (type === 'success' ? 'fa-check-circle' : 'fa-circle-info');
+            
+            toast.className = `${bgClass} text-white px-5 py-3 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.2)] font-bold flex items-center gap-3 transform transition-all duration-300 translate-y-10 opacity-0 pointer-events-auto max-w-sm`;
+            toast.innerHTML = `<i class="fa-solid ${iconClass} text-2xl"></i> <span class="leading-tight text-sm">${msg}</span>`;
+            container.appendChild(toast);
+            
+            // Animation in
+            setTimeout(() => { toast.classList.remove('translate-y-10', 'opacity-0'); }, 10);
+            
+            // Auto remove
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 6000);
+        }
+
+        // --- AUDIO ENGINE ---
+        async function speakText(text) {
+            currentHintText = text;
+            if (!isAudioEnabled) return;
+
+            // Đánh dấu id của lần gọi này. Nếu có lần gọi khác xảy ra, id sẽ thay đổi
+            const mySpeechId = ++currentSpeechId;
+
+            const unitMap = { 'km': 'ki lô mét', 'hm': 'héc tô mét', 'dam': 'đề ca mét', 'm': 'mét', 'dm': 'đề xi mét', 'cm': 'xăng ti mét', 'mm': 'mi li mét', 'kg': 'ki lô gam', 'hg': 'héc tô gam', 'dag': 'đề ca gam', 'g': 'gam' };
+            const units = Object.keys(unitMap).sort((a,b) => b.length - a.length);
+            const unitRegex = new RegExp(`(^|[\\s\\d])(${units.join('|')})(?=[^\\p{L}]|$)`, 'giu');
+
+            let pText = text
+                .replace(/(\d),(\d)/g, '$1 phẩy $2')
+                .replace(/>/g, ' lớn hơn ')
+                .replace(/</g, ' bé hơn ')
+                .replace(/=/g, ' bằng ');
+
+            pText = pText.replace(unitRegex, (match, p1, p2) => p1 + ' ' + unitMap[p2.toLowerCase()] + ' ');
+
+            // Tắt âm thanh CŨ ngay lập tức (nếu đang phát)
+            if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; }
+            if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); }
+            
+            // Thử gọi API Google nếu có key và chưa bị lỗi trước đó
+            if (gcpApiKey && !gcpApiFailed) {
+                try {
+                    const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${gcpApiKey}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ input: { text: pText }, voice: { languageCode: 'vi-VN', name: 'vi-VN-Neural2-A' }, audioConfig: { audioEncoding: 'MP3', speakingRate: 0.95, pitch: 3.0 } })
+                    });
+
+                    // Kiểm tra xem trong lúc fetch mạng có click khác chèn vào không
+                    if (mySpeechId !== currentSpeechId) return;
+
+                    if (res.ok) { 
+                        const d = await res.json(); 
+                        if (mySpeechId !== currentSpeechId) return; // Kiểm tra lại sau khi xử lý JSON
+
+                        if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; }
+                        currentAudio = new Audio("data:audio/mp3;base64," + d.audioContent); 
+                        const playPromise = currentAudio.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(error => { });
+                        }
+                        return; // Gọi Google API thành công thì kết thúc ở đây
+                    } else {
+                        // Báo lỗi, ngừng gọi API ở các câu sau để tránh lag
+                        gcpApiFailed = true; 
+                        const errData = await res.json();
+                        if (errData.error && errData.error.status === "PERMISSION_DENIED") {
+                            showToast("API Key của bạn chưa bật quyền Text-to-Speech. Đang tự động chuyển sang giọng mặc định!", "error");
+                        } else {
+                            showToast("Lỗi kết nối Google TTS. Đang tự động chuyển sang giọng mặc định!", "error");
+                        }
+                    }
+                } catch (e) { 
+                    gcpApiFailed = true;
+                }
+            }
+
+            // Kiểm tra chống chồng chéo trước khi gọi giọng fallback
+            if (mySpeechId !== currentSpeechId) return;
+
+            // Fallback: Sử dụng giọng đọc mặc định của trình duyệt (Browser SpeechSynthesis)
+            if ('speechSynthesis' in window) {
+                const msg = new SpeechSynthesisUtterance(pText); 
+                msg.lang = 'vi-VN'; 
+                msg.rate = 0.9; 
+                msg.pitch = 1.1;
+                
+                // Cố gắng tìm giọng tiếng Việt chuẩn nếu có sẵn trên máy (ưu tiên giọng Google)
+                const voices = window.speechSynthesis.getVoices();
+                const viVoice = voices.find(v => v.lang === 'vi-VN' && v.name.includes('Google')) || voices.find(v => v.lang === 'vi-VN' || v.lang === 'vi');
+                if(viVoice) {
+                    msg.voice = viVoice;
+                }
+
+                window.speechSynthesis.speak(msg);
+            }
+        }
+        
+        // Load danh sách giọng đọc của trình duyệt trước để khi gọi có sẵn
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+        }
+
+        function toggleGlobalAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            document.getElementById('audio-icon').className = isAudioEnabled ? 'fa-solid fa-volume-high text-xl' : 'fa-solid fa-volume-xmark text-xl text-red-400';
+            if(!isAudioEnabled) window.speechSynthesis.cancel(); else speakText("Đã bật âm thanh rộn ràng!");
+        }
+        function playCurrentHint() { if(currentHintText) speakText(currentHintText); }
+        function playSFX(type) {
+            if (!isAudioEnabled) return;
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator(), gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            if (type === 'correct') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(523.25, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(); osc.stop(ctx.currentTime + 0.5);
+            } else {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start(); osc.stop(ctx.currentTime + 0.3);
+            }
+        }
+
+        // --- FLOW ---
+        function initApp() { sessionStartTime = new Date(); loadTeacherData(); renderScreen(); }
+        function nextScreen() { currentStageErrors = 0; if (currentScreenIndex < SCREENS.length - 1) { currentScreenIndex++; renderScreen(); } }
+        function prevScreen() { if (currentScreenIndex > 0) { currentScreenIndex--; currentStageErrors = 0; renderScreen(); } }
+        function showNextBtn(hideId) { 
+            if(hideId) { const e = document.getElementById(hideId); if(e) e.classList.add('hidden'); } 
+            const skipBtn = document.getElementById('btn-skip'); if(skipBtn) skipBtn.classList.add('hidden');
+            document.getElementById('btn-next').classList.remove('hidden'); 
+        }
+        function skipScreen() { playSFX('correct'); nextScreen(); }
+        function goHome() {
+            currentScreenIndex = 0;
+            currentStageErrors = 0;
+            sessionData = { 
+                score: 0, timeSpent: 0, 
+                skills: { readWrite: {c:0, t:0}, compare: {c:0, t:0}, measure: {c:0, t:0}, round: {c:0, t:0}, boss: {c:0, t:0} },
+                errorsLogged: [], badges: [] 
+            };
+            renderScreen();
+        }
+        
+        function updateSkill(skill, isCorrect) {
+            if(!sessionData.skills[skill]) return;
+            sessionData.skills[skill].t++;
+            if(isCorrect) sessionData.skills[skill].c++;
+        }
+
+        // Generate Progress Bar HTML
+        function getProgressBar(currentStep) {
+            if (currentStep === 0 || currentStep === 6) return ''; // Hide on intro/summary
+            const steps = [1, 2, 3, 4, 5];
+            const html = steps.map((s, i) => {
+                let cls = 'step-wait';
+                if (s < currentStep) cls = 'step-done';
+                else if (s === currentStep) cls = 'step-active';
+                
+                let line = '';
+                if (i < steps.length - 1) {
+                    const lCls = s < currentStep ? 'line-done' : '';
+                    line = `<div class="step-line ${lCls}"></div>`;
+                }
+                
+                const icon = s === 5 ? '<i class="fa-solid fa-dragon"></i>' : (s < currentStep ? '<i class="fa-solid fa-check"></i>' : s);
+                return `<div class="step-indicator ${cls}">${icon}</div>${line}`;
+            }).join('');
+            
+            return `<div class="w-full px-8 py-4 bg-indigo-50/50 border-b border-indigo-100 flex items-center justify-between shadow-sm">${html}</div>`;
+        }
+
+        function renderScreen() {
+            const container = document.getElementById('app-container');
+            const data = SCREENS[currentScreenIndex];
+            
+            let contentHTML = '';
+            if(data.type === 'intro') contentHTML = renderIntro(data);
+            else if(data.type === 'mcq') contentHTML = renderMCQ(data);
+            else if(data.type === 'sort') contentHTML = renderSort(data);
+            else if(data.type === 'input') contentHTML = renderInput(data);
+            else if(data.type === 'boss') contentHTML = renderBoss(data);
+            else if(data.type === 'summary') contentHTML = renderSummary(data);
+
+            container.innerHTML = getProgressBar(data.step) + contentHTML;
+
+            // Post-render JS
+            if(data.type === 'sort') initSortDragDrop();
+            if(data.type === 'input' || data.type === 'boss') attachInputFilters();
+            
+            // Auto audio with fun prompts
+            if(data.type === 'intro') setTimeout(()=>speakText("Chào cậu! Tớ là Robo Phẩy siêu cấp vũ trụ đây. Cậu đã sẵn sàng bước vào Trạm tổng ôn cuối cùng chưa? Năng lượng lên nào!"), 500);
+            else if(data.title && data.data && data.data.q) setTimeout(()=>speakText(`${data.title}. ${data.data.q}`), 500);
+            else if(data.type === 'boss') setTimeout(()=>speakText("Màn Boss cuối cùng! Trùm cuối xuất hiện. Cậu hãy đọc thật kỹ lời giải đố của chiếc hộp bí ẩn nhé!"), 500);
+        }
+
+        // --- SCREENS RENDERERS ---
+        function renderIntro(d) {
+            return `
+                <div class="flex-1 flex flex-col items-center justify-center p-8 relative">
+                    <i class="fa-solid fa-ranking-star text-yellow-300/10 text-9xl absolute top-10 left-10"></i>
+                    <i class="fa-solid fa-rocket text-indigo-300/20 text-6xl absolute bottom-20 right-10 animate-pulse"></i>
+                    <div class="w-full flex justify-center mb-4 relative h-32">
+                        <div class="z-10 text-7xl animate-float mt-4 glow-effect rounded-full bg-white p-4 border-4 border-indigo-200">🤖</div>
+                    </div>
+                    <div class="speech-bubble p-6 mb-8 text-center max-w-xl shadow-xl border-4 border-indigo-400 bg-gradient-to-br from-white to-indigo-50">
+                        <h1 class="text-3xl font-black text-indigo-800 mb-2">Đấu Trường Số Thập Phân</h1>
+                        <p class="text-gray-700 font-bold text-lg leading-relaxed">Chào cậu! Tớ là Robo Phẩy siêu cấp vũ trụ đây! 🚀<br>Vậy là chúng ta đã đến Trạm Tổng Ôn cuối cùng. Hãy vận dụng trọn vẹn 100% công lực: Đọc, viết, so sánh, đổi đơn vị và <span class="text-purple-600 font-black">Làm tròn số</span> để rinh ngay Huy hiệu Quán Quân nhé! Cố lên!</p>
+                    </div>
+                    <div class="flex flex-wrap justify-center gap-4 z-10">
+                        <button class="bg-white hover:bg-indigo-50 text-indigo-800 font-bold py-3 px-6 rounded-2xl border-4 border-indigo-200 transition-all text-lg flex items-center gap-2 shadow-sm hover-pop" onclick="speakText('Chào cậu! Tớ là Robo Phẩy siêu cấp vũ trụ đây. Cậu đã sẵn sàng bước vào Trạm tổng ôn cuối cùng chưa? Năng lượng lên nào!');"><i class="fa-solid fa-ear-listen text-xl text-indigo-500"></i> Nghe lời dẫn</button>
+                        <button class="btn-primary" onclick="nextScreen()">Chinh phục ngay <i class="fa-solid fa-bolt ml-2 text-yellow-100"></i></button>
+                    </div>
+                </div>`;
+        }
+
+        function renderMCQ(d) {
+            const opts = d.data.opts.map((o, i) => `
+                <button class="btn-choice relative overflow-hidden group" onclick="chkMCQ(${i}, ${d.data.ans}, ${d.data.trapIdx}, this, '${d.data.hint.replace(/'/g, "\\'")}', '${d.skill}')">
+                    <span class="relative z-10">${o}</span>
+                    <div class="absolute inset-0 bg-indigo-100 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300 z-0"></div>
+                </button>
+            `).join('');
+
+            return `
+                <div class="flex-1 flex flex-col p-8 min-h-max bg-gradient-to-b from-white to-indigo-50/50">
+                    <h2 class="text-3xl font-black text-indigo-800 mb-6 text-center drop-shadow-sm"><i class="fa-solid fa-star text-yellow-400 mr-2"></i>${d.title}</h2>
+                    <div class="bg-white p-6 rounded-3xl shadow-lg border-b-4 border-indigo-200 mb-8 max-w-2xl mx-auto w-full text-center relative">
+                        <div class="absolute -top-4 -left-4 text-4xl transform -rotate-12">📝</div>
+                        <p class="text-2xl font-bold text-gray-800 leading-relaxed">${d.data.q}</p>
+                    </div>
+                    <div class="flex flex-col gap-4 max-w-md mx-auto w-full" id="mcq-opts">${opts}</div>
+                    <div id="mcq-fb" class="mt-6 text-center text-xl font-bold min-h-[3rem] transition-all"></div>
+                    <div class="mt-auto flex flex-wrap justify-between gap-3 w-full pt-4">
+                        <div class="flex gap-2">
+                            <button class="bg-gray-200 hover:bg-gray-300 py-3 px-6 rounded-2xl font-bold text-gray-700 hover-pop" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i></button>
+                            <button id="btn-skip" class="bg-red-100 hover:bg-red-200 py-3 px-4 rounded-2xl font-bold text-red-600 transition-all hover-pop" onclick="skipScreen()" title="Bỏ qua màn này">Bỏ qua <i class="fa-solid fa-forward-step"></i></button>
+                        </div>
+                        <div class="flex gap-2 ml-auto">
+                            <button id="btn-next" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-2xl hidden shadow-[0_4px_0_#16a34a] active:translate-y-1 transition-all hover-pop" onclick="nextScreen()">Sang bài tiếp! <i class="fa-solid fa-rocket"></i></button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function chkMCQ(sel, ans, trap, btn, hint, skill) {
+            const fb = document.getElementById('mcq-fb');
+            if(sel === ans) {
+                playSFX('correct'); updateSkill(skill, true);
+                btn.classList.replace('border-indigo-200', 'border-green-500'); btn.classList.replace('text-indigo-800', 'text-green-700'); btn.classList.add('bg-green-50');
+                fb.innerHTML="<span class='text-green-600 animate-pulse'><i class='fa-solid fa-party-horn mr-2'></i>Tuyệt cú mèo! Cậu chốt đơn chính xác quá! 🌟</span>";
+                speakText("Tuyệt cú mèo! Cậu xử lý mượt quá!");
+                sessionData.score+=10; document.getElementById('mcq-opts').classList.add('pointer-events-none'); showNextBtn();
+            } else {
+                playSFX('wrong'); updateSkill(skill, false); currentStageErrors++; btn.classList.add('shake-error'); setTimeout(()=>btn.classList.remove('shake-error'),500);
+                
+                if(currentStageErrors === 1 && sel === trap) {
+                    fb.innerHTML = "<span class='text-orange-500'><i class='fa-solid fa-triangle-exclamation mr-2'></i>Ái chà, bẫy giăng sẵn mà cậu lỡ đạp trúng rồi! Đọc lại đề kỹ hơn xíu nhé.</span>";
+                    speakText("Ái chà, bẫy giăng sẵn mà cậu lỡ đạp trúng rồi! Đọc lại đề thật chậm rãi xem nào.");
+                    logError(skill, 'trap_fallen', 'Mắc bẫy MCQ');
+                } else {
+                    fb.innerHTML = `<span class='text-indigo-600'><i class='fa-solid fa-lightbulb mr-2 text-yellow-500'></i>Gợi ý siêu to từ Robo: ${hint}</span>`;
+                    speakText("Gợi ý siêu to khổng lồ từ Robo đây: " + hint);
+                    logError(skill, 'wrong_logic', 'Sai MCQ');
+                }
+            }
+            saveTeacherData();
+        }
+
+        function renderSort(d) {
+            const shuf = [...d.data.nums].sort(()=>Math.random()-0.5);
+            const slots = d.data.nums.map(() => `<div class="drop-zone z-s w-24 h-16 bg-gray-50 border-4 border-dashed border-indigo-200 rounded-xl flex items-center justify-center font-bold shrink-0 shadow-inner"></div>`).join('');
+            const docks = shuf.map(n => `<div class="drag-card c-s w-24 h-16 bg-white border-b-4 border-indigo-400 text-indigo-800 rounded-xl shadow-md flex items-center justify-center text-xl font-black shrink-0 hover-pop" draggable="true" data-v="${n}">${n}</div>`).join('');
+            
+            return `
+                <div class="flex-1 flex flex-col p-8 min-h-max bg-gradient-to-b from-white to-indigo-50/50">
+                    <h2 class="text-3xl font-black text-indigo-800 mb-2 text-center drop-shadow-sm"><i class="fa-solid fa-bridge-water text-blue-400 mr-2"></i>${d.title}</h2>
+                    <p class="font-bold text-orange-500 text-center mb-6 text-lg animate-pulse">Chạm hoặc Kéo các thẻ số xếp theo thứ tự: <span class="bg-orange-100 px-2 py-1 rounded text-orange-700">${d.data.type}</span></p>
+                    <div class="flex flex-wrap justify-center gap-4 mb-8 p-6 bg-white rounded-3xl shadow-md border-2 border-indigo-100 relative" id="s-tar">
+                        <div class="absolute -top-3 -right-3 text-3xl transform rotate-12">🎯</div>
+                        ${slots}
+                    </div>
+                    <div class="flex flex-wrap justify-center gap-4 p-4 bg-indigo-50/50 rounded-2xl border-2 border-dashed border-indigo-200" id="s-dock">${docks}</div>
+                    <div id="s-fb" class="text-center text-xl font-bold mt-6 min-h-[3rem] transition-all"></div>
+                    <div class="mt-auto flex flex-wrap justify-between gap-3 w-full pt-4">
+                        <div class="flex gap-2">
+                            <button class="bg-gray-200 hover:bg-gray-300 py-3 px-6 rounded-2xl font-bold text-gray-700 hover-pop" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i></button>
+                            <button id="btn-skip" class="bg-red-100 hover:bg-red-200 py-3 px-4 rounded-2xl font-bold text-red-600 transition-all hover-pop" onclick="skipScreen()" title="Bỏ qua màn này">Bỏ qua <i class="fa-solid fa-forward-step"></i></button>
+                        </div>
+                        <div class="flex gap-2 ml-auto">
+                            <button id="btn-chk" class="btn-primary" onclick="chkSort('${d.data.correct.join(',')}', '${d.skill}', '${d.data.hint.replace(/'/g, "\\'")}')">Chốt Đội Hình! <i class="fa-solid fa-check ml-1"></i></button>
+                            <button id="btn-next" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-2xl hidden shadow-[0_4px_0_#16a34a] active:translate-y-1 transition-all hover-pop" onclick="nextScreen()">Tiếp tục thôi! <i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function initSortDragDrop() {
+            let drg = null;
+            document.querySelectorAll('.c-s').forEach(el => {
+                el.ondragstart=function(){drg=this; setTimeout(()=>this.style.opacity='0.5',0)};
+                el.ondragend=function(){this.style.opacity='1'; drg=null;};
+                el.onclick=function(){
+                    if(this.parentNode.id==='s-dock'){ 
+                        let e=Array.from(document.querySelectorAll('.z-s')).find(z=>!z.children.length); 
+                        if(e) { e.appendChild(this); playSFX('pop'); }
+                    } else {
+                        document.getElementById('s-dock').appendChild(this); playSFX('pop');
+                    }
+                };
+            });
+            document.querySelectorAll('.z-s').forEach(z => {
+                z.ondragover=e=>{e.preventDefault(); z.classList.add('drag-over');};
+                z.ondragleave=()=>z.classList.remove('drag-over');
+                z.ondrop=function(e){ 
+                    e.preventDefault(); 
+                    this.classList.remove('drag-over'); 
+                    if(drg){ 
+                        if(this.children.length) document.getElementById('s-dock').appendChild(this.children[0]); 
+                        this.appendChild(drg); 
+                        playSFX('pop');
+                    }
+                };
+            });
+            const dock = document.getElementById('s-dock');
+            if(dock) {
+                dock.ondragover=e=>e.preventDefault();
+                dock.ondrop=function(e){e.preventDefault(); if(drg) { this.appendChild(drg); playSFX('pop'); }};
+            }
+        }
+
+        function chkSort(ansStr, skill, hint) {
+            let cur = []; document.querySelectorAll('.z-s').forEach(z => { if(z.children.length) cur.push(z.children[0].dataset.v); });
+            const fb = document.getElementById('s-fb');
+            if(cur.length < 4) return speakText("Ế ế, cậu xếp sót thành viên kìa! Kéo hết thẻ lên các ô trống đi đã!");
+            if(cur.join(',') === ansStr) {
+                playSFX('correct'); updateSkill(skill, true); fb.innerHTML="<span class='text-green-500 animate-bounce block'><i class='fa-solid fa-medal mr-2 text-yellow-400'></i>Đỉnh của chóp! Đội hình đã xếp chuẩn không cần chỉnh! 🏆</span>"; 
+                speakText("Đỉnh của chóp! Đội hình đã được sắp xếp chuẩn không cần chỉnh!");
+                sessionData.score+=15; showNextBtn('btn-chk');
+            } else {
+                playSFX('wrong'); updateSkill(skill, false); currentStageErrors++; document.getElementById('s-tar').classList.add('shake-error'); setTimeout(()=>document.getElementById('s-tar').classList.remove('shake-error'),500);
+                if(currentStageErrors === 1) {
+                    fb.innerHTML = "<span class='text-red-500'><i class='fa-solid fa-circle-exclamation mr-2'></i>Khoan đã! Đội hình hơi lộn xộn rồi. Cậu dóng thẳng hàng phần nguyên rồi mới đến phần mười nhé!</span>";
+                    speakText("Khoan đã nào! Đội hình hơi lộn xộn. Cậu dóng thẳng hàng phần nguyên rồi mới đến phần mười nhé, giống như dóng hàng tập thể dục ấy!");
+                } else {
+                    fb.innerHTML = `<span class='text-indigo-600'><i class='fa-solid fa-magnifying-glass mr-2'></i>Gợi ý nè: ${hint}</span>`;
+                    speakText("Gợi ý của tớ: " + hint);
+                    logError(skill, 'sort_error', 'Sai sắp xếp');
+                }
+            }
+            saveTeacherData();
+        }
+
+        function renderInput(d) {
+            return `
+                <div class="flex-1 flex flex-col p-8 min-h-max bg-gradient-to-b from-white to-indigo-50/50">
+                    <h2 class="text-3xl font-black text-indigo-800 mb-6 text-center drop-shadow-sm"><i class="fa-solid fa-ruler-combined text-blue-500 mr-2"></i>${d.title}</h2>
+                    <div class="bg-white p-8 rounded-3xl shadow-xl border-b-4 border-indigo-200 max-w-lg mx-auto w-full flex flex-col items-center relative">
+                        <div class="absolute -top-5 right-5 text-4xl transform rotate-12 animate-pulse">📏</div>
+                        <p class="text-3xl font-black text-gray-800 mb-6 bg-gray-50 px-6 py-2 rounded-xl border border-gray-200 shadow-inner">${d.data.q}</p>
+                        <div class="flex items-center gap-4 w-full">
+                            <input type="text" id="v-input" class="w-full border-4 border-indigo-100 rounded-2xl p-4 text-center text-4xl font-black text-indigo-900 focus:border-yellow-400 focus:outline-none transition-colors shadow-inner" placeholder="Nhập số vào đây...">
+                            <span class="text-3xl font-black text-white bg-indigo-500 px-4 py-2 rounded-xl shrink-0 shadow-md transform rotate-2">${d.data.unit}</span>
+                        </div>
+                    </div>
+                    <div id="i-fb" class="mt-6 text-center text-xl font-bold min-h-[3rem] transition-all"></div>
+                    <div class="mt-auto flex flex-wrap justify-between gap-3 w-full pt-4">
+                        <div class="flex gap-2">
+                            <button class="bg-gray-200 hover:bg-gray-300 py-3 px-6 rounded-2xl font-bold text-gray-700 hover-pop" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i></button>
+                            <button id="btn-skip" class="bg-red-100 hover:bg-red-200 py-3 px-4 rounded-2xl font-bold text-red-600 transition-all hover-pop" onclick="skipScreen()" title="Bỏ qua màn này">Bỏ qua <i class="fa-solid fa-forward-step"></i></button>
+                        </div>
+                        <div class="flex gap-2 ml-auto">
+                            <button id="btn-chk" class="btn-primary" onclick="chkInput('${d.data.ans}', '${d.data.ansAlt}', '${d.skill}', '${d.data.hint.replace(/'/g, "\\'")}')">Truyền Phép! <i class="fa-solid fa-wand-magic-sparkles ml-1"></i></button>
+                            <button id="btn-next" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-2xl hidden shadow-[0_4px_0_#16a34a] active:translate-y-1 transition-all hover-pop" onclick="nextScreen()">Đi tiếp thôi <i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function attachInputFilters() {
+            document.querySelectorAll('input[type="text"]').forEach(inp => {
+                inp.oninput = function(){ this.value = this.value.replace(/\./g,',').replace(/[^0-9,]/g,''); };
+            });
+        }
+
+        function chkInput(ans, ansAlt, skill, hint) {
+            const val = document.getElementById('v-input').value.trim();
+            const fb = document.getElementById('i-fb');
+            if(!val) return speakText("Khoan! Cậu chưa niệm chú (nhập số) kìa!");
+
+            if(val === ans || val === ansAlt) {
+                playSFX('correct'); updateSkill(skill, true); fb.innerHTML = "<span class='text-green-500'><i class='fa-solid fa-hat-wizard mr-2'></i>Chính xác! Cậu quy đổi biến hóa đơn vị cực mượt luôn! ✨</span>";
+                speakText("Chính xác! Phép thuật biến đổi hoàn hảo!");
+                sessionData.score+=15; document.getElementById('v-input').disabled=true; document.getElementById('v-input').classList.add('bg-green-50', 'border-green-400'); showNextBtn('btn-chk');
+            } else {
+                playSFX('wrong'); updateSkill(skill, false); currentStageErrors++; document.getElementById('v-input').classList.add('shake-error'); setTimeout(()=>document.getElementById('v-input').classList.remove('shake-error'),500);
+                if(currentStageErrors === 1) {
+                    fb.innerHTML = "<span class='text-red-500'>Ối, phép thuật hơi lag nhẹ! Lấy nháp ra kẻ bảng đơn vị để đặt dấu phẩy cho chuẩn xác nhé.</span>";
+                    speakText("Ối, phép thuật hơi lag nhẹ! Lấy nháp ra kẻ bảng đơn vị để xem đặt dấu phẩy ở đâu cho bảnh nhé.");
+                } else {
+                    fb.innerHTML = `<span class='text-indigo-600'><i class='fa-regular fa-face-smile-wink mr-2'></i>Gợi ý: ${hint} <br>Đáp án bí mật là: <span class="text-green-600 font-black px-2 bg-green-100 rounded">${ans}</span></span>`;
+                    speakText("Gợi ý của tớ nè: " + hint);
+                    document.getElementById('v-input').value = ans; showNextBtn('btn-chk');
+                    logError(skill, 'conversion_err', 'Sai đổi đơn vị');
+                }
+            }
+            saveTeacherData();
+        }
+
+        // --- BOSS SCREEN (Multi-step) ---
+        function renderBoss(d) {
+            return `
+                <div class="flex-1 flex flex-col p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900 via-purple-900 to-black min-h-max relative overflow-hidden">
+                    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] opacity-30"></div>
+                    
+                    <div class="z-10 text-center mb-6">
+                        <i class="fa-solid fa-skull-crossbones text-red-500 text-4xl mb-2 animate-bounce"></i>
+                        <h2 class="text-3xl font-black text-yellow-400 uppercase tracking-widest glow-effect bg-black/50 inline-block px-8 py-3 rounded-full border-2 border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.5)]">${d.title}</h2>
+                    </div>
+                    
+                    <div class="bg-white/95 backdrop-blur p-8 rounded-3xl shadow-2xl border-4 border-purple-500 max-w-2xl mx-auto w-full z-10 relative">
+                        <div class="absolute -top-6 -right-6 text-6xl animate-float">🎁</div>
+                        <div class="bg-purple-100 border-l-8 border-purple-600 p-5 rounded-r-xl mb-6 shadow-inner">
+                            <p class="text-xl font-bold text-purple-900 leading-snug">${d.data.context}</p>
+                            <p class="text-4xl font-black text-center text-red-600 mt-4 font-mono bg-white inline-block px-6 py-2 border-2 border-red-300 rounded-xl shadow-md rotate-1">${d.data.weight}</p>
+                        </div>
+
+                        <!-- Step 1 -->
+                        <div id="boss-s1" class="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                            <p class="font-bold text-gray-800 mb-3 text-lg"><i class="fa-solid fa-1 text-purple-500 bg-purple-100 px-2 py-1 rounded-full mr-2"></i>Khối lượng hộp quà viết dưới dạng số thập phân là bao nhiêu kg?</p>
+                            <div class="flex items-center gap-3">
+                                <input type="text" id="b-inp-1" class="w-40 border-4 border-indigo-200 rounded-xl p-3 text-2xl font-black text-center text-indigo-900 focus:border-indigo-500 shadow-inner"> <span class="font-black text-xl text-gray-600">kg</span>
+                                <button class="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black hover:bg-indigo-700 ml-auto shadow-[0_4px_0_#4f46e5] active:translate-y-1 transition-all hover-pop" onclick="chkBoss(1)">Chốt <i class="fa-solid fa-lock ml-1"></i></button>
+                            </div>
+                            <div id="b-fb-1" class="mt-2 font-bold text-red-500 h-6"></div>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div id="boss-s2" class="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200 hidden opacity-0 transition-opacity duration-700">
+                            <p class="font-bold text-gray-800 mb-3 text-lg"><i class="fa-solid fa-2 text-purple-500 bg-purple-100 px-2 py-1 rounded-full mr-2"></i><span class="text-purple-700">Làm tròn số vừa tìm được đến hàng phần mười</span> ta được:</p>
+                            <div class="flex items-center gap-3">
+                                <input type="text" id="b-inp-2" class="w-40 border-4 border-purple-200 rounded-xl p-3 text-2xl font-black text-center text-purple-900 focus:border-purple-500 shadow-inner"> <span class="font-black text-xl text-gray-600">kg</span>
+                                <button class="bg-purple-600 text-white px-6 py-3 rounded-xl font-black hover:bg-purple-700 ml-auto shadow-[0_4px_0_#7e22ce] active:translate-y-1 transition-all hover-pop" onclick="chkBoss(2)">Chốt <i class="fa-solid fa-lock ml-1"></i></button>
+                            </div>
+                            <div id="b-fb-2" class="mt-2 font-bold text-red-500 h-6"></div>
+                        </div>
+
+                        <!-- Step 3 -->
+                        <div id="boss-s3" class="bg-gray-50 p-4 rounded-xl border border-gray-200 hidden opacity-0 transition-opacity duration-700">
+                            <p class="font-bold text-gray-800 mb-4 text-lg"><i class="fa-solid fa-3 text-purple-500 bg-purple-100 px-2 py-1 rounded-full mr-2"></i>Khối lượng (đã làm tròn) có lọt qua cửa kiểm duyệt (từ 3,4 đến 3,8) không?</p>
+                            <div class="flex gap-4">
+                                <button class="flex-1 bg-white border-4 border-gray-200 py-4 rounded-2xl font-black text-xl text-gray-600 hover:bg-green-50 hover:border-green-400 hover:text-green-700 hover-pop transition-all" onclick="chkBoss(3, 'có')"><i class="fa-solid fa-thumbs-up mr-2 text-green-500"></i>Hợp lệ nha</button>
+                                <button class="flex-1 bg-white border-4 border-gray-200 py-4 rounded-2xl font-black text-xl text-gray-600 hover:bg-red-50 hover:border-red-400 hover:text-red-700 hover-pop transition-all" onclick="chkBoss(3, 'không')"><i class="fa-solid fa-ban mr-2 text-red-500"></i>Không hợp lệ</button>
+                            </div>
+                            <div id="b-fb-3" class="mt-4 text-center font-bold text-xl h-8"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto flex flex-wrap justify-between gap-3 w-full pt-6 z-10">
+                        <button id="btn-skip" class="bg-red-900/50 hover:bg-red-800 py-3 px-4 rounded-2xl font-bold text-red-200 border border-red-700 transition-all hover-pop" onclick="skipScreen()" title="Bỏ qua màn này">Đầu hàng Boss <i class="fa-solid fa-flag text-sm ml-1"></i></button>
+                        <button id="btn-next" class="btn-primary hidden ml-auto animate-pulse text-xl px-8" onclick="nextScreen()">Nhận Thưởng Quán Quân! <i class="fa-solid fa-crown ml-2"></i></button>
+                    </div>
+                </div>`;
+        }
+
+        function chkBoss(step, valStr) {
+            const fb = document.getElementById(`b-fb-${step}`);
+            if(step === 1) {
+                const v = document.getElementById('b-inp-1').value.trim();
+                if(!v) return speakText("Cậu chưa nhập cân nặng kìa!");
+                if(v === "3,54" || v === "3,540") {
+                    playSFX('correct'); fb.innerHTML = "<span class='text-green-600'><i class='fa-solid fa-check-circle mr-1'></i>Quá mượt!</span>"; 
+                    document.getElementById('b-inp-1').disabled=true; document.getElementById('b-inp-1').classList.add('bg-green-50');
+                    const s2 = document.getElementById('boss-s2'); s2.classList.remove('hidden'); setTimeout(()=>s2.classList.remove('opacity-0'),50);
+                    speakText("Quá đỉnh! Khởi đầu êm ru. Bước 2: Cậu hãy trổ tài làm tròn số đó đến hàng phần mười nhé."); updateSkill('boss', true);
+                } else { 
+                    playSFX('wrong'); fb.innerHTML = "<i class='fa-solid fa-xmark-circle mr-1'></i>Ối, nhầm xíu rồi! Nhớ 540g = 540 phần nghìn kg nha."; 
+                    updateSkill('boss', false); 
+                }
+            } else if(step === 2) {
+                const v = document.getElementById('b-inp-2').value.trim();
+                if(!v) return speakText("Cậu chưa làm tròn số kìa!");
+                if(v === "3,5") {
+                    playSFX('correct'); fb.innerHTML = "<span class='text-green-600'><i class='fa-solid fa-check-circle mr-1'></i>Chuẩn không cần chỉnh!</span>"; 
+                    document.getElementById('b-inp-2').disabled=true; document.getElementById('b-inp-2').classList.add('bg-green-50');
+                    const s3 = document.getElementById('boss-s3'); s3.classList.remove('hidden'); setTimeout(()=>s3.classList.remove('opacity-0'),50);
+                    speakText("Bùm! Làm tròn siêu xuất sắc. Bước chốt hạ: So sánh xem khối lượng này có lọt qua cửa kiểm duyệt không?"); updateSkill('boss', true);
+                } else { 
+                    playSFX('wrong'); fb.innerHTML = "<i class='fa-solid fa-xmark-circle mr-1'></i>Từ từ thôi thám tử! Nhìn hàng phần trăm là 4 (<5) thì hàng phần mười phải giữ nguyên chứ!"; 
+                    updateSkill('boss', false); 
+                }
+            } else if(step === 3) {
+                if(valStr === 'có') {
+                    playSFX('correct'); 
+                    fb.innerHTML = "<span class='text-green-500 animate-bounce block text-2xl drop-shadow'>BÙM CHÍU! 🎆 Cậu đã diệt gọn Boss!</span>";
+                    speakText("Bùm chíu! Cậu phân tích sắc bén như thám tử Conan! Cậu đã chính thức vượt qua Đấu trường Tổng ôn!");
+                    sessionData.score += 30; sessionData.badges.push("Quán Quân Số Thập Phân"); updateSkill('boss', true);
+                    showNextBtn();
+                } else { 
+                    playSFX('wrong'); fb.innerHTML = "<span class='text-red-500'><i class='fa-solid fa-xmark-circle mr-1'></i>Lỗi so sánh phút chót rồi! Dóng hàng phần mười lại xem 5 đứng giữa 4 và 8 cơ mà?</span>"; 
+                    updateSkill('boss', false); 
+                }
+            }
+            saveTeacherData();
+        }
+
+        function renderSummary(d) {
+            const timeDiff = Math.floor((new Date() - sessionStartTime) / 1000);
+            sessionData.timeSpent += timeDiff;
+            const min = Math.floor(sessionData.timeSpent / 60); const sec = sessionData.timeSpent % 60;
+            
+            // Generate Skill bars
+            let skillBars = '';
+            const skillNames = { readWrite: "Cấu tạo số", compare: "So sánh", measure: "Đo lường", round: "Làm tròn", boss: "Tư duy chuỗi" };
+            for(let key in sessionData.skills) {
+                const s = sessionData.skills[key];
+                const pct = s.t === 0 ? 0 : Math.round((s.c / s.t) * 100);
+                let color = pct >= 80 ? 'bg-gradient-to-r from-green-400 to-green-500' : pct >= 50 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' : 'bg-gradient-to-r from-red-400 to-red-500';
+                skillBars += `
+                    <div class="mb-3">
+                        <div class="flex justify-between text-sm font-black text-indigo-900 mb-1"><span>${skillNames[key]}</span><span class="bg-indigo-100 px-2 rounded">${pct}%</span></div>
+                        <div class="w-full bg-gray-200 rounded-full h-4 shadow-inner border border-gray-300"><div class="${color} h-full rounded-full transition-all duration-1000 w-0" style="width: ${pct}%"></div></div>
+                    </div>`;
+            }
+
+            speakText(`Chà chà, xuất sắc luôn! Cậu đã gom được ${sessionData.score} điểm kinh nghiệm. Bảng vàng vinh danh cậu nè, mau khoe thầy cô nha!`);
+            saveTeacherData();
+
+            return `
+                <div class="flex-1 flex flex-col items-center justify-center p-8 bg-arena overflow-y-auto relative">
+                    <!-- Confetti background effect (CSS simplified) -->
+                    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+                        <div class="absolute top-10 left-10 text-4xl animate-bounce" style="animation-delay: 0.1s">✨</div>
+                        <div class="absolute top-20 right-20 text-3xl animate-bounce" style="animation-delay: 0.5s">🎊</div>
+                        <div class="absolute bottom-20 left-1/4 text-5xl animate-bounce" style="animation-delay: 0.3s">🎉</div>
+                    </div>
+
+                    <h1 class="text-4xl font-black text-yellow-400 mb-6 text-center glow-effect bg-indigo-900/80 px-8 py-3 rounded-full border-2 border-yellow-400/50 z-10 shadow-2xl">BẢNG VÀNG VINH DANH</h1>
+                    
+                    <div class="bg-white p-8 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-2xl border-8 border-yellow-400 relative z-10 transform hover:scale-[1.01] transition-transform">
+                        ${sessionData.badges.length > 0 ? `
+                        <div class="absolute -top-16 -right-12 transform rotate-12 z-20 animate-float">
+                            <div class="bg-gradient-to-br from-yellow-300 via-yellow-400 to-yellow-600 rounded-full w-36 h-36 flex flex-col items-center justify-center shadow-[0_10px_25px_rgba(234,179,8,0.6)] border-4 border-white">
+                                <i class="fa-solid fa-medal text-6xl text-white drop-shadow-md"></i>
+                                <span class="text-xs font-black text-yellow-900 text-center leading-tight mt-1 px-2 drop-shadow-sm">QUÁN QUÂN<br>SỐ THẬP PHÂN</span>
+                            </div>
+                        </div>` : ''}
+
+                        <div class="grid grid-cols-2 gap-6 mb-8 mt-4">
+                            <div class="bg-gradient-to-b from-indigo-50 to-white p-5 rounded-2xl text-center border-2 border-indigo-200 shadow-sm">
+                                <p class="text-gray-500 font-black mb-1 uppercase tracking-wider text-sm"><i class="fa-solid fa-star text-yellow-500 mr-1"></i> Điểm Kỹ Năng</p>
+                                <p class="text-6xl font-black text-indigo-700 drop-shadow-sm">${sessionData.score}</p>
+                            </div>
+                            <div class="bg-gradient-to-b from-indigo-50 to-white p-5 rounded-2xl text-center border-2 border-indigo-200 shadow-sm">
+                                <p class="text-gray-500 font-black mb-1 uppercase tracking-wider text-sm"><i class="fa-solid fa-stopwatch text-blue-500 mr-1"></i> Tốc độ chốt đơn</p>
+                                <p class="text-4xl font-black text-indigo-700 mt-3 drop-shadow-sm">${min}p ${sec}s</p>
+                            </div>
+                        </div>
+
+                        <div class="border-t-4 border-dashed border-gray-200 pt-6">
+                            <h3 class="font-black text-indigo-900 text-2xl mb-5 text-center"><i class="fa-solid fa-chart-pie text-indigo-500 mr-2"></i> Hồ Sơ Sức Mạnh:</h3>
+                            ${skillBars}
+                        </div>
+                    </div>
+                    <button class="mt-10 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-black py-4 px-10 rounded-full shadow-[0_6px_0_#ca8a04] active:translate-y-2 active:shadow-none transition-all text-2xl z-10 border-4 border-white" onclick="location.reload()">Chinh Phục Lại Nào! <i class="fa-solid fa-rotate-right ml-2"></i></button>
+                </div>`;
+        }
+
+        // --- TM & Storage ---
+        function logError(skill, type, det) { sessionData.errorsLogged.push({ stage: skill, errorType: type, detail: det, time: new Date().toISOString() }); }
+        function saveTeacherData() { localStorage.setItem(APP_ID + '_cur', JSON.stringify(sessionData)); }
+        function loadTeacherData() { if(!localStorage.getItem(APP_ID + '_hist')) localStorage.setItem(APP_ID + '_hist', JSON.stringify([])); }
+        
+        function handleTeacherTrigger() {
+            clickCountForTeacher++; clearTimeout(teacherTimer); teacherTimer = setTimeout(()=>clickCountForTeacher=0, 2000);
+            if(clickCountForTeacher>=5) { clickCountForTeacher=0; openTM(); }
+        }
+        function openTM() {
+            document.getElementById('teacher-modal').classList.remove('hidden');
+            const cur = JSON.parse(localStorage.getItem(APP_ID + '_cur') || JSON.stringify(sessionData));
+            document.getElementById('tm-avg').innerText = cur.score;
+            document.getElementById('tm-time').innerText = Math.floor(cur.timeSpent/60) + 'p';
+            
+            ['readWrite', 'compare', 'measure', 'round'].forEach((k,i) => {
+                const ids = ['tm-skill-read', 'tm-skill-compare', 'tm-skill-measure', 'tm-skill-round'];
+                const s = cur.skills[k];
+                document.getElementById(ids[i]).innerText = s && s.t > 0 ? Math.round((s.c/s.t)*100)+'%' : '0%';
+            });
+
+            document.getElementById('tm-error-list').innerHTML = cur.errorsLogged.map(e=>`<li class="bg-red-50 p-2 border border-red-100 rounded text-sm"><span class="font-bold text-red-700">[${e.stage}]</span> ${e.detail}</li>`).join('') || "<li class='text-gray-500 italic'>Chưa có lỗi</li>";
+        }
+        function closeTeacherMode() { document.getElementById('teacher-modal').classList.add('hidden'); }
+        function switchTeacherTab(id) { ['stats','errors','objectives'].forEach(i=>document.getElementById('tab-'+i).classList.add('hidden')); document.getElementById('tab-'+id).classList.remove('hidden'); }
+        
+        function exportData(type) {
+            const cur = JSON.parse(localStorage.getItem(APP_ID + '_cur') || JSON.stringify(sessionData));
+            let dataStr = "", mime = "";
+            if(type === 'json') {
+                dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cur, null, 2)); mime = "robo_phay_tram4_data.json";
+            } else if (type === 'csv') {
+                let csv = "Time,Skill,Error Type,Detail\n"; cur.errorsLogged.forEach(e => csv += `${e.time},${e.stage},${e.errorType},"${e.detail}"\n`);
+                dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csv); mime = "robo_phay_tram4_errors.csv";
+            }
+            const node = document.createElement('a'); node.setAttribute("href", dataStr); node.setAttribute("download", mime);
+            document.body.appendChild(node); node.click(); node.remove();
+        }
+        
+        function resetData() { 
+            localStorage.removeItem(APP_ID + '_hist'); 
+            localStorage.removeItem(APP_ID + '_cur'); 
+            const btn = document.getElementById('btn-reset-data');
+            btn.innerText = "Đã Xóa!";
+            btn.classList.replace('bg-red-500', 'bg-gray-500');
+            setTimeout(() => { location.reload(); }, 1000);
+        }
+
+        function unlockAPI() {
+            const p = document.getElementById('api-password').value.trim();
+            if(p === atob(ENCRYPTED_PAYLOAD).split('|')[0]) { 
+                gcpApiKey = atob(ENCRYPTED_PAYLOAD).split('|')[1]; 
+                document.getElementById('auth-modal').classList.add('hidden'); 
+                showToast("Đã kích hoạt quyền năng đọc giọng chuẩn!", "success");
+                initApp(); 
+            }
+            else { 
+                document.getElementById('api-password').classList.add('shake-error'); 
+                setTimeout(()=>document.getElementById('api-password').classList.remove('shake-error'), 500); 
+            }
+        }
+
+        function skipAuth() { 
+            document.getElementById('auth-modal').classList.add('hidden'); 
+            showToast("Bỏ qua xác thực. Sẽ dùng giọng mặc định của máy!", "info");
+            initApp(); 
+        }
+
+        window.onload = () => { 
+            const pwdInput = document.getElementById('api-password');
+            if(pwdInput) {
+                pwdInput.onkeypress = e => { if(e.key === 'Enter') unlockAPI(); };
+            }
+        };
+    </script>
+</body>
+</html>

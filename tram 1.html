@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trạm 1: Xây Nhà Chữ Số - Phiêu lưu cùng Robo Phẩy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800;900&display=swap');
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: #e0f2fe;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Animations */
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(-5%); }
+            50% { transform: translateY(5%); }
+        }
+        .animate-bounce-slow { animation: bounce-slow 3s infinite; }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+        }
+        .shake-error { animation: shake 0.5s; border-color: #ef4444 !important; background-color: #fef2f2 !important; }
+        .success-flash { animation: pulse-green 1s; }
+        
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        /* Drag & Drop Styles */
+        .digit-card {
+            cursor: grab;
+            transition: transform 0.1s;
+        }
+        .digit-card:active { cursor: grabbing; transform: scale(1.1); }
+        .drop-zone {
+            min-height: 4rem;
+            min-width: 3.5rem;
+            transition: all 0.3s;
+        }
+        .drop-zone.drag-over {
+            background-color: #fef08a;
+            border-color: #eab308;
+            transform: scale(1.05);
+        }
+
+        /* Custom Scrollbar for Teacher Mode */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Mascot Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: white;
+            border-radius: .4em;
+        }
+        .speech-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 20%;
+            width: 0;
+            height: 0;
+            border: 20px solid transparent;
+            border-top-color: white;
+            border-bottom: 0;
+            border-left: 0;
+            margin-left: -10px;
+            margin-bottom: -20px;
+        }
+
+        /* UI Components */
+        .btn-primary { @apply bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-2xl shadow-[0_4px_0_#2563eb] active:shadow-[0_0px_0_#2563eb] active:translate-y-1 transition-all text-lg; }
+        .btn-secondary { @apply bg-orange-400 hover:bg-orange-500 text-white font-bold py-3 px-6 rounded-2xl shadow-[0_4px_0_#c2410c] active:shadow-[0_0px_0_#c2410c] active:translate-y-1 transition-all text-lg; }
+        
+        .part-nguyen { @apply bg-blue-100 border-2 border-blue-400 rounded-xl p-2 text-center; }
+        .part-thapphan { @apply bg-orange-100 border-2 border-orange-400 rounded-xl p-2 text-center; }
+    </style>
+</head>
+<body class="h-screen flex flex-col items-center justify-center relative">
+
+    <!-- Global Header (Audio Controls & Logo) -->
+    <div class="fixed top-0 w-full max-w-4xl p-4 flex justify-between items-center z-50">
+        <div class="flex items-center gap-2 cursor-pointer" id="teacher-trigger" onclick="handleTeacherTrigger()">
+            <div class="bg-white p-2 rounded-full shadow-md"><i class="fa-solid fa-city text-blue-500 text-xl"></i></div>
+            <span class="font-extrabold text-blue-800 tracking-wider text-lg drop-shadow-sm">THÀNH PHỐ SỐ THẬP PHÂN</span>
+        </div>
+        <div class="flex gap-3">
+            <button id="btn-audio-toggle" class="bg-white p-3 rounded-full shadow-md text-gray-600 hover:text-blue-500 transition" onclick="toggleGlobalAudio()">
+                <i class="fa-solid fa-volume-high text-xl"></i>
+            </button>
+            <button class="bg-white p-3 rounded-full shadow-md text-gray-600 hover:text-green-500 transition" onclick="speakText('Hãy đọc kĩ đề bài và làm theo hướng dẫn của tớ nhé!')">
+                <i class="fa-solid fa-circle-info text-xl"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="app-container" class="w-full max-w-4xl h-[90vh] mt-10 bg-white rounded-3xl shadow-2xl overflow-hidden relative flex flex-col">
+        <!-- Screens will be injected here -->
+    </div>
+
+    <!-- Teacher Mode Modal (Hidden by default) -->
+    <div id="teacher-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center">
+        <div class="bg-white w-11/12 max-w-3xl h-[80vh] rounded-2xl p-6 flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-chalkboard-user mr-2"></i>Chế độ Giáo Viên - Trạm 1</h2>
+                <button onclick="closeTeacherMode()" class="text-gray-500 hover:text-red-500 text-2xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+            
+            <div class="flex border-b mb-4">
+                <button class="px-4 py-2 font-bold text-blue-600 border-b-2 border-blue-600" onclick="switchTeacherTab('stats')">Thống kê chung</button>
+                <button class="px-4 py-2 font-bold text-gray-500 hover:text-blue-600" onclick="switchTeacherTab('errors')">Lỗi phổ biến</button>
+                <button class="px-4 py-2 font-bold text-gray-500 hover:text-blue-600" onclick="switchTeacherTab('objectives')">Mục tiêu & Đề thi</button>
+            </div>
+
+            <div id="tab-stats" class="flex-1 overflow-y-auto">
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                        <p class="text-sm text-blue-600 font-bold">Số phiên học</p>
+                        <p class="text-3xl font-black text-blue-800" id="tm-sessions">0</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-xl border border-green-200">
+                        <p class="text-sm text-green-600 font-bold">Điểm trung bình</p>
+                        <p class="text-3xl font-black text-green-800" id="tm-avg-score">0</p>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                        <p class="text-sm text-orange-600 font-bold">Tổng số lỗi</p>
+                        <p class="text-3xl font-black text-orange-800" id="tm-total-errors">0</p>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <button class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded" onclick="exportData('json')"><i class="fa-solid fa-file-export mr-2"></i>Xuất JSON</button>
+                    <button class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded" onclick="resetData()"><i class="fa-solid fa-trash mr-2"></i>Xóa Dữ Liệu</button>
+                </div>
+            </div>
+
+            <div id="tab-errors" class="flex-1 overflow-y-auto hidden">
+                <ul class="space-y-3" id="tm-error-list">
+                    <!-- Errors dynamically populated -->
+                </ul>
+            </div>
+
+             <div id="tab-objectives" class="flex-1 overflow-y-auto hidden">
+                <h3 class="font-bold text-lg mb-2">Mục tiêu Trạm 1:</h3>
+                <ul class="list-disc pl-5 mb-4 text-gray-700">
+                    <li>Nhận biết phần nguyên và phần thập phân.</li>
+                    <li>Hiểu giá trị theo vị trí hàng (phần mười, phần trăm, phần nghìn).</li>
+                    <li>Xử lý chính xác các số có chữ số 0 (VD: 4,05; 12,004).</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-80 z-[200] flex items-center justify-center">
+        <div class="bg-white w-11/12 max-w-md rounded-3xl p-8 flex flex-col items-center text-center shadow-2xl border-4 border-blue-400">
+            <div class="text-6xl mb-4">🤖</div>
+            <h2 class="text-2xl font-black text-blue-800 mb-6">Mật mã Trạm 1</h2>
+            <input type="password" id="api-password" class="w-full border-4 border-blue-200 rounded-2xl p-4 text-center text-2xl font-bold mb-4 focus:outline-none focus:border-blue-500" placeholder="Mật khẩu..." autocomplete="off">
+            <div class="flex gap-4 w-full">
+                <button class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 rounded-2xl transition" onclick="skipAuth()">Bỏ qua</button>
+                <button class="flex-1 btn-primary py-3 rounded-2xl" onclick="unlockAPI()">Kích hoạt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // --- DATA & STATE MANAGEMENT ---
+        const APP_ID = 'robo_phay_tram1_v1';
+        let isAudioEnabled = true;
+        let currentScreenIndex = 0;
+        let currentStageErrors = 0; // Tracks errors per question for scaffolding
+        let isStageCompleted = false; // Ngăn chặn bấm nhiều lần
+        let clickCountForTeacher = 0;
+        let teacherTimer = null;
+        
+        // Trạng thái cho hệ thống API Google Cloud TTS
+        let gcpApiKey = null;
+        let currentAudio = null;
+
+        // Chuỗi mã hóa chứa payload kết hợp: "admin|AIzaSyCHkdIkc-tZIYPlyzgPLVwmvRJOuOkhyeE"
+        // Điều này giúp ẩn đi cấu trúc thật của API key khi người bình thường đọc source code.
+        const ENCRYPTED_PAYLOAD = "YWRtaW58QUl6YVN5Q0hrZElrYy10WklZUGx5emdQTFZ3bXZSSk91T2toeWVF";
+
+        let sessionData = {
+            score: 0,
+            correctAnswers: 0,
+            wrongAnswers: 0,
+            errorsLogged: [], // {stage: string, errorType: string, detail: string}
+            badges: []
+        };
+
+        // App content sequence
+        const SCREENS = [
+            { id: 'intro', type: 'intro' },
+            { id: 'explore', type: 'explore' },
+            { id: 'build_1', type: 'build', data: { numberStr: "4,05", desc: "Bốn phẩy không năm", whole: 1, dec: 2 } }, // Whole slots, Dec slots
+            { id: 'build_2', type: 'build', data: { numberStr: "25,009", desc: "Hai mươi lăm phẩy không không chín", whole: 2, dec: 3 } },
+            { id: 'listen_1', type: 'listen', data: { audioText: "Không phẩy bảy mươi ba", answer: "0,73" } },
+            { id: 'listen_2', type: 'listen', data: { audioText: "Mười hai phẩy không không bốn", answer: "12,004" } },
+            { id: 'read_1', type: 'read', data: { numberStr: "116,715", options: ["Một trăm mười sáu phẩy bảy trăm mười lăm", "Một một sáu phẩy bảy một năm", "Mười mười sáu phẩy bảy mười lăm"], correctIndex: 0 } },
+            { id: 'boss', type: 'boss', data: { hint: "Phần nguyên có chữ số hàng chục là 3, đơn vị là 5. Phần thập phân có hàng phần mười là 6, hàng phần trăm là 2, hàng phần nghìn là 4.", answer: "35,624" } },
+            { id: 'summary', type: 'summary' }
+        ];
+
+        // --- AUDIO CONTROLLER ---
+        async function speakText(text) {
+            if (!isAudioEnabled) return;
+
+            // Xử lý dấu phẩy: CHỈ đổi thành chữ " phẩy " nếu nó kẹp giữa 2 chữ số (VD: 3,14 -> 3 phẩy 14)
+            // Các dấu phẩy khác sẽ giữ nguyên để AI ngắt nghỉ nhịp tự nhiên (VD: "4 đơn vị, 5 phần trăm")
+            let processedText = text.replace(/(\d),(\d)/g, '$1 phẩy $2');
+
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+
+            if (gcpApiKey) {
+                try {
+                    const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${gcpApiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            input: { text: processedText },
+                            // Chọn giọng nữ chất lượng cao nhất của Tiếng Việt
+                            voice: { languageCode: 'vi-VN', name: 'vi-VN-Neural2-A' }, 
+                            // Pitch cao lên một chút để tạo cảm giác giọng của "Robo"
+                            audioConfig: { audioEncoding: 'MP3', speakingRate: 0.9, pitch: 3.0 } 
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        currentAudio = new Audio("data:audio/mp3;base64," + data.audioContent);
+                        
+                        // Xử lý Promise của hàm play() để tránh lỗi AbortError khi bấm liên tục
+                        const playPromise = currentAudio.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(error => {
+                                if (error.name !== 'AbortError') {
+                                    console.error("Lỗi phát âm thanh:", error);
+                                }
+                            });
+                        }
+                        return; // Kết thúc ở đây nếu API gọi thành công
+                    }
+                } catch (e) {
+                    console.error("Lỗi Google TTS API:", e);
+                    // Lỗi rớt mạng hoặc key sai -> rơi xuống dùng fallback bên dưới
+                }
+            }
+
+            // Fallback: Web Speech API mặc định nếu không có API Key
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); // Stop current speech
+                const msg = new SpeechSynthesisUtterance(processedText);
+                msg.lang = 'vi-VN';
+                msg.rate = 0.9; // Slightly slower for kids
+                msg.pitch = 1.1; // Slightly higher pitch for "Robo" feel
+                window.speechSynthesis.speak(msg);
+            }
+        }
+
+        function toggleGlobalAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            const icon = document.querySelector('#btn-audio-toggle i');
+            if (isAudioEnabled) {
+                icon.className = 'fa-solid fa-volume-high text-xl';
+                speakText("Đã bật âm thanh.");
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-xl text-red-500';
+                window.speechSynthesis.cancel();
+            }
+        }
+
+        function playSFX(type) {
+            if (!isAudioEnabled) return;
+            // Native Web Audio API for simple beeps to avoid external assets
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            
+            if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.1); // C6
+                gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(); osc.stop(ctx.currentTime + 0.5);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start(); osc.stop(ctx.currentTime + 0.3);
+            }
+        }
+
+        // --- CORE LOGIC & RENDERER ---
+        function initApp() {
+            loadTeacherData(); // Ensure localstorage exists
+            renderScreen();
+        }
+
+        function nextScreen() {
+            currentStageErrors = 0; // Reset errors for new stage
+            if (currentScreenIndex < SCREENS.length - 1) {
+                currentScreenIndex++;
+                renderScreen();
+            }
+        }
+
+        function prevScreen() {
+            if (isStageCompleted) return;
+            if (currentScreenIndex > 0) {
+                isStageCompleted = true;
+                currentScreenIndex--;
+                currentStageErrors = 0; // Reset errors
+                renderScreen();
+            }
+        }
+
+        function skipQuestion() {
+            if (isStageCompleted) return;
+            isStageCompleted = true;
+            // Ghi nhận học sinh đã bỏ qua câu hỏi này
+            logError(SCREENS[currentScreenIndex].type, 'skipped', 'Học sinh đã bỏ qua thử thách này.');
+            sessionData.wrongAnswers++; // Tính là một lần chưa vượt qua để cập nhật tỉ lệ
+            nextScreen();
+        }
+
+        function renderScreen() {
+            isStageCompleted = false; // Reset cờ trạng thái mỗi khi sang màn mới
+            const container = document.getElementById('app-container');
+            const screenData = SCREENS[currentScreenIndex];
+            container.innerHTML = ''; // Clear current
+            
+            switch (screenData.type) {
+                case 'intro': renderIntro(container); break;
+                case 'explore': renderExplore(container); break;
+                case 'build': renderBuild(container, screenData.data); break;
+                case 'listen': renderListen(container, screenData.data); break;
+                case 'read': renderRead(container, screenData.data); break;
+                case 'boss': renderBoss(container, screenData.data); break;
+                case 'summary': renderSummary(container); break;
+            }
+        }
+
+        // --- SCREEN RENDERS ---
+
+        function renderIntro(container) {
+            container.innerHTML = `
+                <div class="flex-1 flex flex-col items-center justify-center p-8 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9IiNiYmU1ZWQiLz48L3N2Zz4=')]">
+                    <div class="text-7xl mb-4 animate-bounce-slow">🤖</div>
+                    <div class="speech-bubble p-6 mb-8 text-center max-w-lg shadow-lg border-4 border-blue-200">
+                        <h1 class="text-3xl font-black text-blue-600 mb-2">Chào cậu! Tớ là Robo Phẩy.</h1>
+                        <p class="text-gray-700 text-lg font-medium">Cậu đã sẵn sàng khám phá <span class="text-orange-500 font-bold">Thành phố Số thập phân</span> chưa? Cùng tớ tìm đúng ngôi nhà cho các chữ số nhé!</p>
+                    </div>
+                    <div class="flex gap-4">
+                        <button class="btn-primary flex items-center gap-2" onclick="speakText('Chào cậu! Tớ là Robo Phẩy. Cậu đã sẵn sàng khám phá Thành phố Số thập phân chưa? Cùng tớ tìm đúng ngôi nhà cho các chữ số nhé!');"><i class="fa-solid fa-ear-listen"></i> Nghe cô giới thiệu</button>
+                        <button class="btn-secondary flex items-center gap-2" onclick="nextScreen()">Bắt đầu ngay <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                </div>
+            `;
+            // Đã gỡ bỏ setTimeout tự động phát âm ở đây
+        }
+
+        function renderExplore(container) {
+            container.innerHTML = `
+                <div class="flex-1 flex flex-col p-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-magnifying-glass text-blue-500 mr-2"></i> Khám phá Ngôi nhà số</h2>
+                        <button class="text-gray-500 hover:text-blue-500" onclick="speakText('Bấm vào từng chữ số để xem tên ngôi nhà của nó nhé.')"><i class="fa-solid fa-circle-question text-2xl"></i></button>
+                    </div>
+                    
+                    <div class="bg-blue-50 rounded-2xl p-6 border-2 border-dashed border-blue-300 flex-1 flex flex-col items-center justify-center">
+                        <p class="mb-4 text-gray-600 font-bold text-lg">Số mẫu: 35,624</p>
+                        
+                        <div class="flex items-end gap-2 text-3xl font-black mb-8">
+                            <!-- Phần nguyên -->
+                            <div class="flex flex-col items-center gap-2 part-nguyen cursor-pointer hover:bg-blue-200" onclick="showExploreHint('Số 3 đứng ở hàng chục. Thuộc phần nguyên nhé.', 'blue')">
+                                <span class="text-sm text-blue-600">Hàng chục</span>
+                                <span>3</span>
+                            </div>
+                            <div class="flex flex-col items-center gap-2 part-nguyen cursor-pointer hover:bg-blue-200" onclick="showExploreHint('Số 5 đứng ở hàng đơn vị. Nằm ngay sát dấu phẩy luôn!', 'blue')">
+                                <span class="text-sm text-blue-600">Hàng đ.vị</span>
+                                <span>5</span>
+                            </div>
+                            
+                            <!-- Dấu phẩy -->
+                            <div class="flex flex-col items-center justify-end h-full pb-2 px-2 cursor-pointer" onclick="showExploreHint('Dấu phẩy đây rồi! Ranh giới quan trọng ngăn cách phần nguyên và phần thập phân đấy!', 'gray')">
+                                <span class="text-red-500 text-5xl">,</span>
+                            </div>
+
+                            <!-- Phần thập phân -->
+                            <div class="flex flex-col items-center gap-2 part-thapphan cursor-pointer hover:bg-orange-200" onclick="showExploreHint('Qua dấu phẩy là phần thập phân. Số 6 đang ở hàng phần mười.', 'orange')">
+                                <span class="text-sm text-orange-600">Phần mười</span>
+                                <span>6</span>
+                            </div>
+                            <div class="flex flex-col items-center gap-2 part-thapphan cursor-pointer hover:bg-orange-200" onclick="showExploreHint('Tiếp theo là số 2. Bạn ấy thuộc hàng phần trăm nha.', 'orange')">
+                                <span class="text-sm text-orange-600">Phần trăm</span>
+                                <span>2</span>
+                            </div>
+                            <div class="flex flex-col items-center gap-2 part-thapphan cursor-pointer hover:bg-orange-200" onclick="showExploreHint('Cuối cùng là số 4 nhỏ nhắn ở hàng phần nghìn.', 'orange')">
+                                <span class="text-sm text-orange-600">Phần nghìn</span>
+                                <span>4</span>
+                            </div>
+                        </div>
+
+                        <div id="explore-feedback" class="h-16 text-xl font-bold text-center w-full max-w-md rounded-xl flex items-center justify-center text-gray-500 bg-white shadow-sm border">
+                            Bấm vào các số ở trên để xem vị trí của chúng nhé!
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-between">
+                        <button class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-2xl shadow-[0_4px_0_#9ca3af] active:shadow-[0_0px_0_#9ca3af] active:translate-y-1 transition-all text-lg" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i> Quay lại</button>
+                        <button class="btn-primary" onclick="nextScreen()">Đã hiểu, Tiếp tục <i class="fa-solid fa-check"></i></button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showExploreHint(text, color) {
+            const fb = document.getElementById('explore-feedback');
+            fb.innerText = text;
+            fb.className = `h-16 text-xl font-bold text-center w-full max-w-md rounded-xl flex items-center justify-center shadow-sm border ${
+                color === 'blue' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                color === 'orange' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                'bg-gray-100 text-gray-700 border-gray-300'
+            }`;
+            speakText(text);
+        }
+
+        function renderBuild(container, data) {
+            const digits = data.numberStr.replace(',', '').split('');
+            // Shuffle digits for the dock
+            const shuffledDigits = [...digits].sort(() => Math.random() - 0.5);
+            
+            let wholeSlots = '';
+            for(let i=0; i<data.whole; i++) wholeSlots += `<div class="drop-zone part-nguyen w-16 h-16 flex items-center justify-center text-3xl font-black bg-white" data-expected="${digits[i]}"></div>`;
+            
+            let decSlots = '';
+            for(let i=0; i<data.dec; i++) decSlots += `<div class="drop-zone part-thapphan w-16 h-16 flex items-center justify-center text-3xl font-black bg-white" data-expected="${digits[data.whole + i]}"></div>`;
+
+            container.innerHTML = `
+                <div class="flex-1 flex flex-col p-8 overflow-y-auto">
+                     <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-trowel-bricks text-blue-500 mr-2"></i> Kéo thả Xây nhà</h2>
+                        <div class="flex gap-2">
+                             <button class="text-gray-500 hover:text-green-500" onclick="speakText('${data.desc}')"><i class="fa-solid fa-ear-listen text-2xl"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="text-center mb-6 bg-blue-50 p-4 rounded-xl shadow-sm border border-blue-100 relative shrink-0">
+                        <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-4xl">🤖</div>
+                        <p class="text-xl font-bold text-blue-800 mt-2">Robo đọc yêu cầu: "${data.desc}"</p>
+                    </div>
+
+                    <!-- Target House -->
+                    <div class="flex justify-center items-end gap-3 mb-10 bg-gray-50 py-8 rounded-2xl border-2 border-dashed border-gray-300 shadow-inner shrink-0" id="build-house">
+                        ${wholeSlots}
+                        <div class="text-red-500 text-6xl font-black pb-2">,</div>
+                        ${decSlots}
+                    </div>
+
+                    <!-- Source Digits -->
+                    <div class="flex justify-center gap-4 bg-white p-6 rounded-2xl shadow border border-gray-100 shrink-0 flex-wrap" id="digit-dock">
+                        ${shuffledDigits.map(d => `<div class="digit-card w-14 h-14 bg-gray-800 text-white rounded-lg shadow-md flex items-center justify-center text-3xl font-black" draggable="true">${d}</div>`).join('')}
+                    </div>
+
+                    <!-- Feedback Area -->
+                    <div id="build-feedback" class="mt-6 text-center text-lg font-bold min-h-[2rem] text-red-500 shrink-0"></div>
+
+                    <div class="mt-auto pt-4 flex justify-between items-center w-full flex-wrap gap-4 shrink-0">
+                        <div class="flex gap-3">
+                            <button class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-2xl shadow-[0_4px_0_#9ca3af] active:shadow-[0_0px_0_#9ca3af] active:translate-y-1 transition-all text-lg" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i> Quay lại</button>
+                            <button class="bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-3 px-6 rounded-2xl shadow-[0_4px_0_#d1d5db] active:shadow-[0_0px_0_#d1d5db] active:translate-y-1 transition-all text-lg" onclick="skipQuestion()">Bỏ qua <i class="fa-solid fa-forward"></i></button>
+                        </div>
+                        <button class="btn-primary" onclick="checkBuildTarget('${data.numberStr}')">Kiểm tra <i class="fa-solid fa-check"></i></button>
+                    </div>
+                </div>
+            `;
+            initDragAndDrop();
+            setTimeout(() => speakText(`Hãy xây nhà cho số: ${data.desc}`), 500);
+        }
+
+        function initDragAndDrop() {
+            const draggables = document.querySelectorAll('.digit-card');
+            const dropZones = document.querySelectorAll('.drop-zone');
+            const dock = document.getElementById('digit-dock');
+
+            let draggedItem = null;
+
+            draggables.forEach(draggable => {
+                draggable.addEventListener('dragstart', function() {
+                    draggedItem = this;
+                    setTimeout(() => this.style.opacity = '0.5', 0);
+                });
+                draggable.addEventListener('dragend', function() {
+                    setTimeout(() => {
+                        this.style.opacity = '1';
+                        draggedItem = null;
+                    }, 0);
+                });
+                
+                // Fallback click to select for better accessibility
+                draggable.addEventListener('click', function() {
+                    if (this.parentElement === dock) {
+                        const emptyZone = Array.from(dropZones).find(z => z.children.length === 0);
+                        if(emptyZone) emptyZone.appendChild(this);
+                    } else {
+                        dock.appendChild(this);
+                    }
+                });
+            });
+
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+                zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+                zone.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('drag-over');
+                    if (draggedItem) {
+                        if (this.children.length > 0) {
+                            dock.appendChild(this.children[0]); // Return existing to dock
+                        }
+                        this.appendChild(draggedItem);
+                    }
+                });
+            });
+            
+            // Allow dropping back to dock
+            dock.addEventListener('dragover', e => e.preventDefault());
+            dock.addEventListener('drop', function(e) {
+                e.preventDefault();
+                if(draggedItem) this.appendChild(draggedItem);
+            });
+        }
+
+        function checkBuildTarget(correctNumberStr) {
+            if (isStageCompleted) return;
+
+            const zones = document.querySelectorAll('.drop-zone');
+            let currentStr = "";
+            let isFull = true;
+            let firstErrorIndex = -1;
+
+            zones.forEach((zone, index) => {
+                if (zone.children.length === 0) {
+                    isFull = false;
+                } else {
+                    const val = zone.children[0].innerText;
+                    currentStr += val;
+                    if (val !== zone.getAttribute('data-expected') && firstErrorIndex === -1) {
+                        firstErrorIndex = index;
+                    }
+                }
+            });
+
+            const feedback = document.getElementById('build-feedback');
+
+            if (!isFull) {
+                feedback.innerText = "Cậu nhớ đặt hết các chữ số vào ô trống nhé!";
+                speakText("Cậu chưa xếp xong kìa, nhớ đặt hết các số vào ô trống nhé.");
+                return;
+            }
+
+            // Check against correct format (removing comma for comparison of digits)
+            const correctDigits = correctNumberStr.replace(',', '');
+            
+            if (currentStr === correctDigits) {
+                isStageCompleted = true;
+                playSFX('correct');
+                
+                // Trừ điểm nếu sai nhiều lần
+                let pointsEarned = 10;
+                if (currentStageErrors === 1) pointsEarned = 8;
+                if (currentStageErrors >= 2) pointsEarned = 5;
+
+                feedback.innerHTML = `<span class="text-green-500">Hoan hô! Cậu xây nhà cho các chữ số rất chính xác! (+${pointsEarned} điểm) ⭐</span>`;
+                speakText("Hoan hô! Cậu làm rất chính xác!");
+                sessionData.score += pointsEarned;
+                sessionData.correctAnswers++;
+                document.getElementById('build-house').classList.add('success-flash');
+                setTimeout(() => nextScreen(), 2500);
+            } else {
+                playSFX('wrong');
+                currentStageErrors++;
+                sessionData.wrongAnswers++;
+                document.getElementById('build-house').classList.add('shake-error');
+                setTimeout(() => document.getElementById('build-house').classList.remove('shake-error'), 500);
+
+                // 3-Tier Feedback scaffolding
+                if (currentStageErrors === 1) {
+                    feedback.innerText = "Chưa đúng vị trí rồi, cậu kiểm tra lại xem sao nhé! 🤔";
+                    speakText("Chưa đúng vị trí rồi, cậu kiểm tra lại cẩn thận nhé.");
+                } else if (currentStageErrors === 2) {
+                    let part = firstErrorIndex < correctNumberStr.indexOf(',') ? "Phần nguyên" : "Phần thập phân";
+                    feedback.innerText = `Gợi ý nè: Cậu hãy xem kĩ lại các số ở ${part} nha. 🔍`;
+                    speakText(`Gợi ý nè: Cậu hãy xem kĩ lại ${part} xem có đặt nhầm số nào không nha.`);
+                    logError('build', 'wrong_position_tier2', `Lỗi sai ở ${part} số ${correctNumberStr}`);
+                } else {
+                    const expectedDigit = correctDigits[firstErrorIndex];
+                    let positionName = getPositionName(correctNumberStr, firstErrorIndex);
+                    feedback.innerHTML = `Để tớ giúp một tay! Ở <span class="font-bold text-blue-600">${positionName}</span> phải là chữ số <span class="font-bold text-xl">${expectedDigit}</span> mới đúng. 💡`;
+                    speakText(`Để tớ giúp cậu nhé. Ở ${positionName} phải là chữ số ${expectedDigit} cơ. Cậu nhớ nhé!`);
+                    logError('build', 'wrong_position_tier3', `Sai nhiều lần tại số ${correctNumberStr}`);
+                }
+            }
+            saveTeacherData();
+        }
+
+        function getPositionName(numberStr, digitIndex) {
+            const parts = numberStr.split(',');
+            const wholeLen = parts[0].length;
+            if (digitIndex < wholeLen) {
+                const diff = wholeLen - digitIndex;
+                if (diff === 1) return "hàng đơn vị";
+                if (diff === 2) return "hàng chục";
+                if (diff === 3) return "hàng trăm";
+            } else {
+                const decIndex = digitIndex - wholeLen;
+                if (decIndex === 0) return "hàng phần mười";
+                if (decIndex === 1) return "hàng phần trăm";
+                if (decIndex === 2) return "hàng phần nghìn";
+            }
+            return "hàng này";
+        }
+
+        function renderListen(container, data) {
+            container.innerHTML = `
+                <div class="flex-1 flex flex-col items-center justify-center p-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-8 self-start w-full"><i class="fa-solid fa-headphones text-blue-500 mr-2"></i> Lắng nghe & Ghi chép</h2>
+                    
+                    <button class="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-24 h-24 flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95 mb-10" onclick="speakText('${data.audioText}')">
+                        <i class="fa-solid fa-volume-high text-4xl"></i>
+                    </button>
+
+                    <div class="w-full max-w-sm mb-4">
+                        <input type="text" id="listen-input" class="w-full border-4 border-blue-200 rounded-2xl p-4 text-center text-4xl font-black text-gray-800 focus:outline-none focus:border-blue-500 transition-colors" placeholder="Gõ số vào đây..." autocomplete="off">
+                    </div>
+                    
+                    <p class="text-sm text-gray-500 mb-6">(Dùng dấu phẩy hoặc dấu chấm đều được)</p>
+                    <div id="listen-feedback" class="h-8 text-lg font-bold text-red-500 text-center mb-6"></div>
+
+                    <div class="w-full max-w-sm flex gap-3">
+                        <button class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-4 rounded-2xl shadow-[0_4px_0_#9ca3af] active:shadow-[0_0px_0_#9ca3af] active:translate-y-1 transition-all text-lg" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button class="bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-3 px-4 rounded-2xl shadow-[0_4px_0_#d1d5db] active:shadow-[0_0px_0_#d1d5db] active:translate-y-1 transition-all text-sm whitespace-nowrap" onclick="skipQuestion()">Bỏ qua <i class="fa-solid fa-forward"></i></button>
+                        <button class="btn-primary flex-1" onclick="checkListenTarget('${data.answer}')">Chốt <i class="fa-solid fa-check"></i></button>
+                    </div>
+                </div>
+            `;
+            
+            const input = document.getElementById('listen-input');
+            input.addEventListener('input', function(e) {
+                // Auto convert dot to comma for Vietnamese standard
+                if (this.value.includes('.')) {
+                    this.value = this.value.replace(/\./g, ',');
+                }
+                // Allow only numbers and comma
+                this.value = this.value.replace(/[^0-9,]/g, '');
+                // Prevent multiple commas
+                const parts = this.value.split(',');
+                if(parts.length > 2) {
+                    this.value = parts[0] + ',' + parts.slice(1).join('');
+                }
+            });
+
+            input.addEventListener('keypress', function(e) {
+                if(e.key === 'Enter') checkListenTarget(data.answer);
+            });
+        }
+
+        function checkListenTarget(correctAnswer) {
+            if (isStageCompleted) return;
+
+            const input = document.getElementById('listen-input');
+            let userVal = input.value.trim();
+            const feedback = document.getElementById('listen-feedback');
+
+            if (!userVal) return;
+
+            if (userVal === correctAnswer) {
+                isStageCompleted = true;
+                playSFX('correct');
+                input.classList.add('border-green-500', 'bg-green-50');
+                
+                // Trừ điểm nếu sai nhiều lần
+                let pointsEarned = 10;
+                if (currentStageErrors === 1) pointsEarned = 8;
+                if (currentStageErrors >= 2) pointsEarned = 5;
+
+                feedback.innerHTML = `<span class="text-green-500">Tuyệt vời! Cậu nghe và viết số rất chuẩn xác! (+${pointsEarned} điểm) 🌟</span>`;
+                speakText("Tuyệt vời! Cậu làm rất tốt.");
+                sessionData.score += pointsEarned;
+                sessionData.correctAnswers++;
+                setTimeout(() => nextScreen(), 2000);
+            } else {
+                playSFX('wrong');
+                currentStageErrors++;
+                sessionData.wrongAnswers++;
+                input.classList.add('shake-error');
+                setTimeout(() => input.classList.remove('shake-error'), 500);
+
+                if (currentStageErrors === 1) {
+                    feedback.innerText = "Chưa đúng rồi, cậu thử bấm loa nghe lại thật kĩ nhé. 🎧";
+                    speakText("Chưa đúng rồi, cậu hãy nghe lại một lần nữa nhé.");
+                } else if (currentStageErrors === 2) {
+                    if (!userVal.includes(',')) {
+                         feedback.innerText = "Khoan đã, hình như cậu quên mất dấu phẩy rồi kìa! 🖍️";
+                         speakText("Khoan đã, hình như cậu quên viết dấu phẩy rồi kìa.");
+                         logError('listen', 'missing_comma', `Quên dấu phẩy cho số ${correctAnswer}`);
+                    } else if (userVal.length < correctAnswer.length) {
+                         feedback.innerText = "Cậu đếm thử xem mình có viết thiếu chữ số 0 nào không nhé. 🧐";
+                         speakText("Cậu nhẩm lại xem mình có viết thiếu chữ số không nào không nhé.");
+                         logError('listen', 'missing_zero', `Thiếu số 0 ở số ${correctAnswer}`);
+                    } else {
+                         feedback.innerText = "Suýt đúng rồi! Cậu kiểm tra lại phần thập phân xem sao. 🔍";
+                         speakText("Suýt thì đúng rồi, cậu kiểm tra kĩ lại phần thập phân phía sau dấu phẩy nhé.");
+                    }
+                } else {
+                    isStageCompleted = true;
+                    feedback.innerText = `Số đúng phải là: ${correctAnswer}. Cậu chú ý hơn ở lần sau nhé! ✨`;
+                    speakText(`Số đúng phải là ${correctAnswer}. Tớ sẽ điền giúp cậu nhé, lần sau cố lên!`);
+                    input.value = correctAnswer;
+                    logError('listen', 'failed_listen', `Sai 3 lần số ${correctAnswer}`);
+                    setTimeout(() => nextScreen(), 3500);
+                }
+            }
+            saveTeacherData();
+        }
+
+        function renderRead(container, data) {
+            const btnHtml = data.options.map((opt, idx) => `
+                <button class="w-full text-left p-4 mb-4 rounded-xl border-2 border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-400 text-lg text-gray-700 font-bold transition-all" onclick="checkReadTarget(${idx}, ${data.correctIndex}, this, '${data.numberStr}')">
+                    ${opt}
+                </button>
+            `).join('');
+
+            container.innerHTML = `
+                <div class="flex-1 flex flex-col p-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fa-solid fa-book-open-reader text-blue-500 mr-2"></i> Đọc số thật chuẩn</h2>
+                    
+                    <div class="text-center mb-8">
+                        <p class="text-gray-500 mb-2 font-bold">Số cần đọc:</p>
+                        <div class="text-6xl font-black text-blue-600 bg-blue-50 py-6 rounded-2xl border border-blue-200 shadow-inner inline-block px-12">${data.numberStr}</div>
+                    </div>
+
+                    <div id="read-feedback" class="h-8 text-center text-red-500 font-bold mb-4"></div>
+
+                    <div class="w-full max-w-2xl mx-auto flex-1">
+                        ${btnHtml}
+                    </div>
+
+                    <div class="mt-auto flex justify-start gap-3 w-full">
+                        <button class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-2xl shadow-[0_4px_0_#9ca3af] active:shadow-[0_0px_0_#9ca3af] active:translate-y-1 transition-all text-lg" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i> Quay lại</button>
+                        <button class="bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-3 px-6 rounded-2xl shadow-[0_4px_0_#d1d5db] active:shadow-[0_0px_0_#d1d5db] active:translate-y-1 transition-all text-lg" onclick="skipQuestion()">Bỏ qua <i class="fa-solid fa-forward"></i></button>
+                    </div>
+                </div>
+            `;
+            setTimeout(() => speakText(`Cậu chọn cách đọc đúng cho số ${data.numberStr} nhé.`), 500);
+        }
+
+        function checkReadTarget(selectedIndex, correctIndex, btnElement, numberStr) {
+            if (isStageCompleted) return;
+
+            const feedback = document.getElementById('read-feedback');
+            
+            if (selectedIndex === correctIndex) {
+                isStageCompleted = true;
+                playSFX('correct');
+                
+                // Trừ điểm nếu sai nhiều lần
+                let pointsEarned = 10;
+                if (currentStageErrors === 1) pointsEarned = 8;
+                if (currentStageErrors >= 2) pointsEarned = 5;
+
+                btnElement.classList.remove('border-blue-200', 'bg-white');
+                btnElement.classList.add('border-green-500', 'bg-green-100', 'text-green-800');
+                feedback.innerHTML = `<span class="text-green-500">Chính xác! Cậu đọc số thập phân rất giỏi! (+${pointsEarned} điểm) 🏆</span>`;
+                speakText("Chính xác! Cậu chọn rất đúng.");
+                sessionData.score += pointsEarned;
+                sessionData.correctAnswers++;
+                setTimeout(() => nextScreen(), 2000);
+            } else {
+                playSFX('wrong');
+                currentStageErrors++;
+                sessionData.wrongAnswers++;
+                btnElement.classList.remove('border-blue-200');
+                btnElement.classList.add('shake-error');
+                setTimeout(() => btnElement.classList.remove('shake-error', 'border-red-500', 'bg-red-50'), 500);
+
+                if (currentStageErrors === 1) {
+                    feedback.innerText = "Cách đọc này chưa chính xác, cậu chọn lại đáp án khác xem. 📖";
+                    speakText("Cách đọc này chưa chính xác, cậu thử lại nhé.");
+                } else {
+                    feedback.innerText = "Gợi ý cho cậu: Nhớ đọc rõ chữ 'phẩy' để ngăn cách phần nguyên và phần thập phân nhé. 💡";
+                    speakText("Gợi ý cho cậu: Khi đọc số thập phân, nhất định phải đọc chữ 'phẩy' lên nhé.");
+                    logError('read', 'wrong_read_format', `Đọc sai số ${numberStr}`);
+                }
+            }
+            saveTeacherData();
+        }
+
+        function renderBoss(container, data) {
+            container.innerHTML = `
+                <div class="flex-1 flex flex-col p-8 bg-gradient-to-br from-purple-100 to-blue-100 relative overflow-hidden">
+                    <!-- Boss Icon bg -->
+                    <i class="fa-solid fa-crown text-purple-200 text-9xl absolute -right-10 -bottom-10 opacity-50 transform -rotate-12"></i>
+                    
+                    <h2 class="text-2xl font-bold text-purple-800 mb-6 z-10"><i class="fa-solid fa-bolt text-yellow-500 mr-2"></i> Thử thách Kiến trúc sư</h2>
+                    
+                    <div class="bg-white p-6 rounded-2xl shadow-xl border-2 border-purple-300 z-10 mb-8 relative">
+                        <div class="absolute -top-5 -left-5 text-4xl bg-yellow-400 rounded-full w-12 h-12 flex items-center justify-center shadow-lg border-2 border-white text-white">⭐</div>
+                        <p class="text-lg text-gray-700 font-bold leading-relaxed">
+                            "${data.hint}"
+                        </p>
+                        <button class="mt-4 text-purple-500 hover:text-purple-700 font-bold text-sm flex items-center gap-1" onclick="speakText('${data.hint}')">
+                            <i class="fa-solid fa-circle-play"></i> Đọc lại gợi ý
+                        </button>
+                    </div>
+
+                    <div class="z-10 w-full max-w-sm mx-auto mb-4">
+                        <input type="text" id="boss-input" class="w-full border-4 border-purple-300 rounded-2xl p-4 text-center text-4xl font-black text-gray-800 focus:outline-none focus:border-purple-600 transition-colors" placeholder="Nhập số..." autocomplete="off">
+                    </div>
+                    
+                    <div id="boss-feedback" class="z-10 h-10 text-lg font-bold text-red-500 text-center mb-4"></div>
+
+                    <div class="z-10 mt-auto flex justify-between items-center w-full">
+                        <div class="flex gap-3">
+                            <button class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-2xl shadow-[0_4px_0_#9ca3af] active:shadow-[0_0px_0_#9ca3af] active:translate-y-1 transition-all text-lg" onclick="prevScreen()"><i class="fa-solid fa-arrow-left"></i> Quay lại</button>
+                            <button class="bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-3 px-6 rounded-2xl shadow-[0_4px_0_#d1d5db] active:shadow-[0_0px_0_#d1d5db] active:translate-y-1 transition-all text-lg" onclick="skipQuestion()">Bỏ qua <i class="fa-solid fa-forward"></i></button>
+                        </div>
+                        <button class="btn-primary bg-purple-600 hover:bg-purple-700 shadow-[0_4px_0_#6b21a8] active:shadow-[0_0px_0_#6b21a8] px-8" onclick="checkBossTarget('${data.answer}')">Mở khóa cửa <i class="fa-solid fa-key ml-2"></i></button>
+                    </div>
+                </div>
+            `;
+            
+            const input = document.getElementById('boss-input');
+            input.addEventListener('input', function(e) {
+                if (this.value.includes('.')) this.value = this.value.replace(/\./g, ',');
+                this.value = this.value.replace(/[^0-9,]/g, '');
+            });
+            input.addEventListener('keypress', function(e) { if(e.key === 'Enter') checkBossTarget(data.answer); });
+
+            setTimeout(() => speakText("Thử thách cuối cùng. Cậu hãy đọc kĩ mật thư để tìm ra con số bí ẩn nhé!"), 500);
+        }
+
+        function checkBossTarget(correctAnswer) {
+            if (isStageCompleted) return;
+
+             const input = document.getElementById('boss-input');
+            let userVal = input.value.trim();
+            const feedback = document.getElementById('boss-feedback');
+
+            if (!userVal) return;
+
+            if (userVal === correctAnswer) {
+                isStageCompleted = true;
+                playSFX('correct');
+                
+                // Trừ điểm nếu sai nhiều lần
+                let pointsEarned = 20;
+                if (currentStageErrors === 1) pointsEarned = 15;
+                if (currentStageErrors >= 2) pointsEarned = 10;
+
+                feedback.innerHTML = `<span class="text-green-600">Xuất sắc! Cậu đã giải được mật mã và hoàn thành thử thách! (+${pointsEarned} điểm) 👑🎇</span>`;
+                speakText("Xuất sắc! Cậu đã giải được mật mã và trở thành Kiến trúc sư thực thụ rồi.");
+                sessionData.score += pointsEarned; // Boss gives more points
+                sessionData.correctAnswers++;
+                sessionData.badges.push("Kiến trúc sư Số thập phân");
+                setTimeout(() => nextScreen(), 3000);
+            } else {
+                playSFX('wrong');
+                currentStageErrors++;
+                sessionData.wrongAnswers++;
+                input.classList.add('shake-error');
+                setTimeout(() => input.classList.remove('shake-error'), 500);
+
+                if (currentStageErrors === 1) {
+                    feedback.innerText = "Mật mã chưa đúng rồi. Cậu đọc lại thật kĩ từng dữ kiện nhé! 🕵️‍♂️";
+                    speakText("Mật mã chưa đúng rồi, cậu đọc lại từng dữ kiện thật cẩn thận nhé.");
+                } else if (currentStageErrors === 2) {
+                    feedback.innerText = "Gợi ý: Cậu hãy tìm Phần nguyên trước, đặt dấu phẩy, rồi mới tìm Phần thập phân. 🧩";
+                    speakText("Gợi ý này: Cậu cứ bình tĩnh tìm phần nguyên trước, ghi dấu phẩy, rồi mới ghép phần thập phân vào sau.");
+                    logError('boss', 'logic_error', 'Sai logic bài boss');
+                } else {
+                    isStageCompleted = true;
+                    feedback.innerHTML = `Thử thách này hơi khó một chút. Đáp án đúng là <span class="text-purple-700 font-black">${correctAnswer}</span>. 🤖`;
+                    speakText(`Thử thách này hơi khó một chút. Đáp án đúng phải là ${correctAnswer}. Cậu đừng buồn nhé, lần sau mình sẽ làm được!`);
+                    input.value = correctAnswer;
+                    setTimeout(() => nextScreen(), 4500);
+                }
+            }
+            saveTeacherData();
+        }
+
+        function renderSummary(container) {
+            // Tổng số câu hỏi trong toàn bộ trạm (chỉ đếm các màn có tương tác trả lời)
+            const totalPlayableQs = SCREENS.filter(s => ['build', 'listen', 'read', 'boss'].includes(s.type)).length;
+            // Tính độ chính xác dựa trên tổng số lượng câu hỏi thực tế (bỏ qua cũng bị trừ tỉ lệ)
+            const accuracy = Math.round((sessionData.correctAnswers / totalPlayableQs) * 100);
+            
+            // Generate review hints based on errors
+            let hints = "";
+            const errorTypes = sessionData.errorsLogged.map(e => e.errorType);
+            if (errorTypes.includes('missing_comma') || errorTypes.includes('wrong_position_tier2')) {
+                hints += "<li>Chú ý vị trí dấu phẩy phân cách phần nguyên và phần thập phân.</li>";
+            }
+            if (errorTypes.includes('missing_zero')) {
+                hints += "<li>Cẩn thận với các chữ số 0 ở phần thập phân (VD: không trăm linh bốn -> ,004).</li>";
+            }
+            if (errorTypes.includes('skipped')) {
+                hints += "<li>Cậu đã bỏ qua một số thử thách. Lần sau hãy dũng cảm suy nghĩ thêm một chút nhé, sai thì mình làm lại!</li>";
+            }
+            
+            // Nếu không có lỗi cụ thể nào nhưng tỉ lệ không tuyệt đối
+            if (hints === "") {
+                if (accuracy === 100) {
+                    hints = "<li>Tuyệt vời! Cậu nắm bài rất chắc. Hãy duy trì phong độ này nhé!</li>";
+                } else {
+                    hints = "<li>Cậu làm khá tốt, nhưng hãy ôn tập kĩ hơn một chút để đạt điểm số tuyệt đối nhé!</li>";
+                }
+            }
+
+            container.innerHTML = `
+                <div class="flex-1 flex flex-col items-center justify-center p-8 bg-green-50 overflow-y-auto">
+                    <h1 class="text-4xl font-black text-green-600 mb-2">BÁO CÁO NHIỆM VỤ</h1>
+                    <p class="text-gray-600 font-bold mb-8">Trạm 1: Xây nhà chữ số</p>
+
+                    <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-2xl border-4 border-green-200 relative">
+                        <!-- Badge -->
+                        ${sessionData.badges.length > 0 ? `
+                        <div class="absolute -top-12 -right-8 transform rotate-12">
+                            <div class="bg-yellow-400 rounded-full w-24 h-24 flex flex-col items-center justify-center shadow-lg border-4 border-white">
+                                <i class="fa-solid fa-medal text-4xl text-white"></i>
+                                <span class="text-[10px] font-black text-white text-center leading-tight mt-1">KIẾN TRÚC SƯ</span>
+                            </div>
+                        </div>` : ''}
+
+                        <div class="grid grid-cols-2 gap-6 mb-8 text-center">
+                            <div class="bg-blue-50 p-4 rounded-2xl">
+                                <p class="text-gray-500 font-bold mb-1">Điểm số</p>
+                                <p class="text-4xl font-black text-blue-600">${sessionData.score}</p>
+                            </div>
+                            <div class="bg-orange-50 p-4 rounded-2xl">
+                                <p class="text-gray-500 font-bold mb-1">Độ chính xác</p>
+                                <p class="text-4xl font-black text-orange-600">${accuracy}%</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <h3 class="font-bold text-gray-800 text-lg mb-2 border-b-2 border-green-200 pb-1"><i class="fa-solid fa-lightbulb text-yellow-500 mr-2"></i> Gợi ý ôn tập cho cậu:</h3>
+                            <ul class="list-disc pl-6 text-gray-700 space-y-2 font-medium">
+                                ${hints}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <button class="mt-8 btn-primary bg-green-500 hover:bg-green-600 shadow-[0_4px_0_#16a34a] active:shadow-[0_0px_0_#16a34a]" onclick="location.reload()">Chơi lại từ đầu <i class="fa-solid fa-rotate-right ml-2"></i></button>
+                </div>
+            `;
+            setTimeout(() => speakText(`Chúc mừng cậu đã hoàn thành Trạm 1. Cậu đạt được ${sessionData.score} điểm. Hãy xem kĩ phần gợi ý ôn tập nhé.`), 500);
+        }
+
+        // --- TEACHER MODE & UTILS ---
+        function logError(stage, type, detail) {
+            sessionData.errorsLogged.push({ stage, errorType: type, detail, time: new Date().toISOString() });
+        }
+
+        function saveTeacherData() {
+            let history = JSON.parse(localStorage.getItem(APP_ID + '_history') || '[]');
+            // Update the last entry if it's the current session, or create new (simplified logic: just save latest state to a session array)
+            // For a real app, you'd manage session IDs. Here we'll just push complete sessions at the end, but for live tracking we update a single object.
+            localStorage.setItem(APP_ID + '_currentSession', JSON.stringify(sessionData));
+        }
+
+        function loadTeacherData() {
+            // Check if there's a history
+            if(!localStorage.getItem(APP_ID + '_history')) {
+                localStorage.setItem(APP_ID + '_history', JSON.stringify([]));
+            }
+        }
+
+        // Hidden trigger: Click the logo 5 times quickly
+        function handleTeacherTrigger() {
+            clickCountForTeacher++;
+            if(teacherTimer) clearTimeout(teacherTimer);
+            teacherTimer = setTimeout(() => { clickCountForTeacher = 0; }, 2000);
+
+            if(clickCountForTeacher >= 5) {
+                clickCountForTeacher = 0;
+                openTeacherMode();
+            }
+        }
+
+        function openTeacherMode() {
+            const modal = document.getElementById('teacher-modal');
+            modal.classList.remove('hidden');
+            
+            // Calculate dummy/mock stats based on history + current
+            let history = JSON.parse(localStorage.getItem(APP_ID + '_history') || '[]');
+            const current = JSON.parse(localStorage.getItem(APP_ID + '_currentSession') || JSON.stringify(sessionData));
+            
+            // For demo purpose, we merge current session into history logic to show something
+            const allSessions = [...history, current].filter(s => s.score > 0 || s.errorsLogged.length > 0);
+            
+            document.getElementById('tm-sessions').innerText = allSessions.length;
+            
+            let totalScore = 0;
+            let totalErrors = 0;
+            let allErrors = [];
+
+            allSessions.forEach(s => {
+                totalScore += s.score;
+                totalErrors += s.errorsLogged.length;
+                allErrors = allErrors.concat(s.errorsLogged);
+            });
+
+            document.getElementById('tm-avg-score').innerText = allSessions.length > 0 ? Math.round(totalScore / allSessions.length) : 0;
+            document.getElementById('tm-total-errors').innerText = totalErrors;
+
+            // Render Error list
+            const errorList = document.getElementById('tm-error-list');
+            if(allErrors.length === 0) {
+                errorList.innerHTML = '<li class="text-gray-500 italic">Chưa có dữ liệu lỗi.</li>';
+            } else {
+                errorList.innerHTML = allErrors.reverse().slice(0, 10).map(e => `
+                    <li class="bg-red-50 p-3 rounded border border-red-100 flex justify-between">
+                        <div>
+                            <span class="font-bold text-red-700">[${e.stage}]</span> <span class="text-gray-700">${e.detail}</span>
+                        </div>
+                        <span class="text-xs text-gray-500">${new Date(e.time).toLocaleTimeString()}</span>
+                    </li>
+                `).join('');
+            }
+        }
+
+        function closeTeacherMode() {
+            document.getElementById('teacher-modal').classList.add('hidden');
+        }
+
+        function switchTeacherTab(tabId) {
+            ['stats', 'errors', 'objectives'].forEach(id => {
+                document.getElementById('tab-' + id).classList.add('hidden');
+            });
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+        }
+
+        function exportData(format) {
+            let history = JSON.parse(localStorage.getItem(APP_ID + '_history') || '[]');
+            const current = JSON.parse(localStorage.getItem(APP_ID + '_currentSession') || JSON.stringify(sessionData));
+            const exportObj = { app: "Trạm 1", timestamp: new Date(), data: [...history, current] };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href",     dataStr);
+            downloadAnchorNode.setAttribute("download", "robo_phay_tram1_data.json");
+            document.body.appendChild(downloadAnchorNode); // required for firefox
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            alert("Đã tải xuống file JSON.");
+        }
+
+        function resetData() {
+            if(confirm("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu học tập trên máy này?")) {
+                localStorage.removeItem(APP_ID + '_history');
+                localStorage.removeItem(APP_ID + '_currentSession');
+                alert("Đã xóa dữ liệu.");
+                closeTeacherMode();
+                location.reload();
+            }
+        }
+
+        // --- AUTH API LOGIC ---
+        function unlockAPI() {
+            const inputPass = document.getElementById('api-password').value.trim();
+            if (!inputPass) return;
+            
+            try {
+                // Giải mã và trích xuất API Key dựa vào mật khẩu
+                const decoded = atob(ENCRYPTED_PAYLOAD);
+                const parts = decoded.split('|');
+                if (inputPass === parts[0]) { // Kiểm tra mật khẩu (admin)
+                    gcpApiKey = parts[1];
+                    document.getElementById('auth-modal').classList.add('hidden');
+                    initApp();
+                    // Đã gỡ bỏ setTimeout phát âm báo kích hoạt thành công tại đây.
+                } else {
+                    document.getElementById('api-password').classList.add('shake-error');
+                    setTimeout(() => document.getElementById('api-password').classList.remove('shake-error'), 500);
+                }
+            } catch (e) {
+                console.error("Lỗi giải mã", e);
+            }
+        }
+
+        function skipAuth() {
+            document.getElementById('auth-modal').classList.add('hidden');
+            initApp();
+        }
+
+        // Hỗ trợ bấm Enter để nhận mật khẩu
+        document.getElementById('api-password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') unlockAPI();
+        });
+
+        // Start App
+        window.onload = () => {
+            // Auth modal đã hiển thị sẵn. Quá trình initApp() sẽ được gọi sau khi nhập pass hoặc bấm Bỏ qua.
+        };
+    </script>
+</body>
+</html>
